@@ -16,6 +16,7 @@ require (
 	github.com/flanksource/commons v1.4.3
 	github.com/frankban/quicktest v1.5.0 // indirect
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa // indirect
+	github.com/go-logr/logr v0.2.1
 	github.com/go-test/deep v1.0.7
 	github.com/gosimple/slug v1.9.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 // indirect
@@ -60,6 +61,8 @@ require (
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
+)
 
-	github.com/go-logr/logr v0.2.1
+replace (
+	k8s.io/client-go => k8s.io/client-go v0.19.3
 )
