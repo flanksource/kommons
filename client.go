@@ -348,14 +348,14 @@ func (c *Client) RemoveVolumeAttachment(va storagev1.VolumeAttachment) error {
 
 	if len(va.Finalizers) > 0 {
 		va.Finalizers = []string{}
-		if _, err := volumeAPI.Update(context.TODO(), &va); err != nil {
+		if _, err := volumeAPI.Update(context.TODO(), &va, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to remove finalizers from volume attachment %s: %v", va.Name, err)
 		}
 	}
 
 	c.Infof("Removing volume attachment %s", va.Name)
 
-	if err := volumeAPI.Delete(context.TODO(), va.Name, nil); err != nil {
+	if err := volumeAPI.Delete(context.TODO(), va.Name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("failed to delete volume attachment %s: %v", va.Name, err)
 	}
 
@@ -934,7 +934,7 @@ func (c *Client) ForceDeleteNamespace(ns string, timeout time.Duration) error {
 }
 
 // Undelete an object by removing terminationTimestamp and gracePeriod
-func (c *Client) Undelete(kind, name, namespace string, object types.RuntimeObjectWithMetadata) error {
+func (c *Client) Undelete(kind, name, namespace string, object RuntimeObjectWithMetadata) error {
 	ctx := context.Background()
 
 	apiResource, err := c.GetAPIResource(kind)
@@ -1042,7 +1042,7 @@ func (c *Client) UndeleteCRD(kind, name, namespace string) error {
 }
 
 // Orphan an object by removing ownerReferences
-func (c *Client) Orphan(kind, name, namespace string, object types.RuntimeObjectWithMetadata) error {
+func (c *Client) Orphan(kind, name, namespace string, object RuntimeObjectWithMetadata) error {
 	ctx := context.Background()
 
 	apiResource, err := c.GetAPIResource(kind)
@@ -1153,7 +1153,7 @@ func (c *Client) GetEtcdClient(ctx context.Context) (*etcd.Client, error) {
 	if err != nil {
 		return nil, perrors.Wrap(err, "failed to get clientset")
 	}
-	secret, err := clientset.CoreV1().Secrets("kube-system").Get("etcd-certs", metav1.GetOptions{})
+	secret, err := clientset.CoreV1().Secrets("kube-system").Get(context.TODO(), "etcd-certs", metav1.GetOptions{})
 	if err != nil {
 		return nil, perrors.Wrap(err, "failed to get secret etcd-certs in namespace kube-system")
 	}
