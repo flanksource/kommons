@@ -1,6 +1,8 @@
 package kommons
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -26,4 +28,10 @@ func (dk DynamicKind) SetGroupVersionKind(gvk schema.GroupVersionKind) {}
 
 func (dk DynamicKind) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(dk.APIVersion, dk.Kind)
+}
+
+type RuntimeObjectWithMetadata interface {
+	GetObjectMeta() metav1.Object
+	GetObjectKind() schema.ObjectKind
+	DeepCopyObject() runtime.Object
 }

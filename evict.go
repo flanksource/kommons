@@ -122,6 +122,21 @@ func (c *Client) EvictNode(nodeName string) error {
 			return err
 		}
 	}
+
+	volumeAttachments, err := client.StorageV1().VolumeAttachments().List(context.TODO(), metav1.ListOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	for _, va := range volumeAttachments.Items {
+		if va.Spec.NodeName == nodeName {
+			if err := c.RemoveVolumeAttachment(va); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
