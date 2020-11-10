@@ -61,6 +61,7 @@ import (
 type Client struct {
 	logger.Logger
 	GetKubeConfigBytes  func() ([]byte, error)
+	GetRESTConfig       func() (*rest.Config, error)
 	ApplyDryRun         bool
 	ApplyHook           ApplyHook
 	Trace               bool
@@ -291,7 +292,7 @@ func (c *Client) GetClientset() (*kubernetes.Clientset, error) {
 	return c.client, err
 }
 
-func (c *Client) GetRESTConfig() (*rest.Config, error) {
+func (c *Client) GetRESTConfigFromKubeconfig() (*rest.Config, error) {
 	if c.restConfig != nil {
 		return c.restConfig, nil
 	}
@@ -305,6 +306,18 @@ func (c *Client) GetRESTConfig() (*rest.Config, error) {
 
 	c.restConfig, err = clientcmd.RESTConfigFromKubeConfig(data)
 	return c.restConfig, err
+}
+
+func (c *Client) GetRESTConfigInCluster() (*rest.Config, error) {
+	if c.restConfig != nil {
+		return c.restConfig, nil
+	}
+	data, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("getRESTConfig: failed to get in cluster config: %v", err)
+	}
+
+	return data, nil
 }
 
 // GetSecret returns the data of a secret or nil for any error
