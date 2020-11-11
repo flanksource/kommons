@@ -812,11 +812,11 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				c.Errorf("error updating: %s/%s/%s : %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
 				if (resource.Resource == "deployments" || resource.Resource == "daemonsets") && strings.Contains(fmt.Sprintf("%+v", err), "field is immutable") {
 					c.Errorf("Immutable field change required in %s/%s/%s, attempting to delete", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName())
-					if delerr := client.Delete(existing.GetName(), &metav1.DeleteOptions{}); delerr != nil {
+					if delerr := client.Delete(context.TODO(), existing.GetName(), &metav1.DeleteOptions{}); delerr != nil {
 						c.Errorf("Failed to delete %s/%s/%s: %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
 						return delerr
 					}
-					if updated, err = client.Create(newObject, metav1.CreateOptions{}); err != nil {
+					if updated, err = client.Create(context.TODO(), newObject, metav1.CreateOptions{}); err != nil {
 						c.Errorf("Failed to create new %s/%s/%s: %+v", newObject.GetNamespace(), resource.Resource, newObject.GetName(), err)
 						return err
 					}
