@@ -791,6 +791,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			// apps/DameonSet MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 			// webhook CA's
 
+			newObject := unstructuredObj.DeepCopy()
 			c.trace("updating", unstructuredObj)
 			unstructuredObj.SetResourceVersion(existing.GetResourceVersion())
 			unstructuredObj.SetSelfLink(existing.GetSelfLink())
@@ -807,8 +808,21 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			}
 			updated, err := client.Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
 			if err != nil {
+				//Primarily cert-manager version upgrade, but should redeploy any incompatible deployments
 				c.Errorf("error updating: %s/%s/%s : %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
-				continue
+				if (resource.Resource == "deployments" || resource.Resource == "daemonsets") && strings.Contains(fmt.Sprintf("%+v", err), "field is immutable") {
+					c.Errorf("Immutable field change required in %s/%s/%s, attempting to delete", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName())
+					if delerr := client.Delete(existing.GetName(), &metav1.DeleteOptions{}); delerr != nil {
+						c.Errorf("Failed to delete %s/%s/%s: %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
+						return delerr
+					}
+					if updated, err = client.Create(newObject, metav1.CreateOptions{}); err != nil {
+						c.Errorf("Failed to create new %s/%s/%s: %+v", newObject.GetNamespace(), resource.Resource, newObject.GetName(), err)
+						return err
+					}
+				} else {
+					return err
+				}
 			}
 
 			if updated.GetResourceVersion() == unstructuredObj.GetResourceVersion() {
