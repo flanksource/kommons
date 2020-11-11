@@ -810,7 +810,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			if err != nil {
 				//Primarily cert-manager version upgrade, but should redeploy any incompatible deployments
 				c.Errorf("error updating: %s/%s/%s : %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
-				if resource.Resource == "deployments" && strings.Contains(fmt.Sprintf("%+v", err), "field is immutable") {
+				if (resource.Resource == "deployments" || resource.Resource == "daemonsets") && strings.Contains(fmt.Sprintf("%+v", err), "field is immutable") {
 					c.Errorf("Immutable field change required in %s/%s/%s, attempting to delete", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName())
 					if delerr := client.Delete(existing.GetName(), &metav1.DeleteOptions{}); delerr != nil {
 						c.Errorf("Failed to delete %s/%s/%s: %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
