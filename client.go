@@ -93,18 +93,24 @@ func (c *Client) GetEtcdClientGenerator(ca *certs.Certificate) (*etcd.EtcdClient
 }
 
 func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
-	return &Client{
+	client := &Client{
 		Logger: logger.StandardLogger(),
 		GetKubeConfigBytes: func() ([]byte, error) {
 			return kubeconfig, nil
 		},
-	}, nil
+	}
+	client.GetRESTConfig = client.GetRESTConfigFromKubeconfig
+
+	return client, nil
 }
 
 func NewClient(config *rest.Config, logger logger.Logger) *Client {
 	return &Client{
 		restConfig: config,
 		Logger:     logger,
+		GetRESTConfig: func() (*rest.Config, error) {
+			return config, nil
+		},
 	}
 }
 
