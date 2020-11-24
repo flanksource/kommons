@@ -2024,11 +2024,19 @@ func (c *Client) GetHealth() Health {
 	if err != nil {
 		return Health{Error: err}
 	}
-	pods, err := client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return Health{Error: err}
+	startTime := time.Now()
+	pods := *v1.PodList{}
+	for startTime.Add(60 * time.Second).After(time.Now()) {
+		pods, err = client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return Health{Error: err}
+		}
+		if len(pods) == 0 {
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
 	}
-
 	for _, pod := range pods.Items {
 		if IsDeleted(&pod) {
 			continue
