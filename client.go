@@ -826,6 +826,16 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 						c.Errorf("Failed to create new %s/%s/%s: %+v", newObject.GetNamespace(), resource.Resource, newObject.GetName(), err)
 						return err
 					}
+				} else if (unstructuredObj.GetKind() == "RoleBinding" || unstructuredObj.GetKind() == "ClusterRoleBinding") && strings.Contains(fmt.Sprintf("%+v", err), "cannot change roleRef") {
+					c.Errorf("Immutable field change required in %s/%s/%s, attempting to delete", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName())
+					if delerr := client.Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{}); delerr != nil {
+						c.Errorf("Failed to delete %s/%s/%s: %+v", unstructuredObj.GetNamespace(), resource.Resource, unstructuredObj.GetName(), err)
+						return delerr
+					}
+					if updated, err = client.Create(context.TODO(), newObject, metav1.CreateOptions{}); err != nil {
+						c.Errorf("Failed to create new %s/%s/%s: %+v", newObject.GetNamespace(), resource.Resource, newObject.GetName(), err)
+						return err
+					}
 				} else {
 					return err
 				}
