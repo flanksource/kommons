@@ -21,6 +21,7 @@ require (
 	github.com/gosimple/slug v1.9.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.9.5 // indirect
+	github.com/hairyhenderson/gomplate/v3 v3.6.0
 	github.com/hairyhenderson/toml v0.3.1-0.20191004034452-2a4f3b6160f2 // indirect
 	github.com/hashicorp/consul/api v1.4.0 // indirect
 	github.com/hashicorp/go-getter v1.4.1 // indirect
@@ -39,6 +40,7 @@ require (
 	github.com/sirupsen/logrus v1.7.0
 	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
+	github.com/tidwall/gjson v1.6.7
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.20.0 // indirect
 	github.com/vbauerster/mpb/v5 v5.0.3 // indirect
@@ -63,6 +65,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace (
-	k8s.io/client-go => k8s.io/client-go v0.19.3
-)
+replace k8s.io/client-go => k8s.io/client-go v0.19.3
