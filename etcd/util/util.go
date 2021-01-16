@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"github.com/flanksource/kommons/k8s/etcd"
+	"github.com/flanksource/kommons/etcd"
 )
 
 // MemberForName returns the etcd member with the matching name.
