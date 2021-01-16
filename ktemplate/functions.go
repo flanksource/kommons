@@ -18,6 +18,6 @@ func NewFunctions(clientset *kubernetes.Clientset) *Functions {
 func (f *Functions) FuncMap() template.FuncMap {
 	fm := gomplate.Funcs(nil)
 	fm["kget"] = f.KGet
-	fm["jsonpath"] = f.JSONPath
+	fm["jsonPath"] = f.JSONPath
 	return fm
 }
