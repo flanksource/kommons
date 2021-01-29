@@ -58,20 +58,23 @@ import (
 	"k8s.io/client-go/transport"
 )
 
+var immutableAnnotations = []string{"cnrm.cloud.google.com/project-id"}
+
 type Client struct {
 	logger.Logger
-	GetKubeConfigBytes  func() ([]byte, error)
-	GetRESTConfig       func() (*rest.Config, error)
-	ApplyDryRun         bool
-	ApplyHook           ApplyHook
-	Trace               bool
-	GetKustomizePatches func() ([]string, error)
-	client              *kubernetes.Clientset
-	dynamicClient       dynamic.Interface
-	restConfig          *rest.Config
-	etcdClientGenerator *etcd.EtcdClientGenerator
-	kustomizeManager    *kustomize.Manager
-	restMapper          meta.RESTMapper
+	GetKubeConfigBytes   func() ([]byte, error)
+	GetRESTConfig        func() (*rest.Config, error)
+	ApplyDryRun          bool
+	ApplyHook            ApplyHook
+	ImmutableAnnotations []string
+	Trace                bool
+	GetKustomizePatches  func() ([]string, error)
+	client               *kubernetes.Clientset
+	dynamicClient        dynamic.Interface
+	restConfig           *rest.Config
+	etcdClientGenerator  *etcd.EtcdClientGenerator
+	kustomizeManager     *kustomize.Manager
+	restMapper           meta.RESTMapper
 }
 
 func (c *Client) GetEtcdClientGenerator(ca *certs.Certificate) (*etcd.EtcdClientGenerator, error) {
@@ -94,7 +97,8 @@ func (c *Client) GetEtcdClientGenerator(ca *certs.Certificate) (*etcd.EtcdClient
 
 func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
 	client := &Client{
-		Logger: logger.StandardLogger(),
+		ImmutableAnnotations: immutableAnnotations,
+		Logger:               logger.StandardLogger(),
 		GetKubeConfigBytes: func() ([]byte, error) {
 			return kubeconfig, nil
 		},
@@ -106,8 +110,9 @@ func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
 
 func NewClient(config *rest.Config, logger logger.Logger) *Client {
 	return &Client{
-		restConfig: config,
-		Logger:     logger,
+		ImmutableAnnotations: immutableAnnotations,
+		restConfig:           config,
+		Logger:               logger,
 		GetRESTConfig: func() (*rest.Config, error) {
 			return config, nil
 		},
@@ -649,6 +654,15 @@ func (c *Client) GetProxyDialer(p proxy.Proxy) (*proxy.Dialer, error) {
 	return proxy.NewDialer(p, clientset, restConfig)
 }
 
+func SetAnnotation(obj *unstructured.Unstructured, key string, value string) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[key] = value
+	obj.SetAnnotations(annotations)
+}
+
 func (c *Client) ApplyUnstructured(namespace string, objects ...*unstructured.Unstructured) error {
 	for _, unstructuredObj := range objects {
 		client, err := c.GetRestClient(*unstructuredObj)
@@ -673,6 +687,11 @@ func (c *Client) ApplyUnstructured(namespace string, objects ...*unstructured.Un
 					spec["clusterIP"] = existing.Object["spec"].(map[string]interface{})["clusterIP"]
 				} else if unstructuredObj.GetKind() == "ServiceAccount" {
 					unstructuredObj.Object["secrets"] = existing.Object["secrets"]
+				}
+				for _, immutable := range c.ImmutableAnnotations {
+					if existing, ok := existing.GetAnnotations()[immutable]; ok {
+						SetAnnotation(unstructuredObj, immutable, existing)
+					}
 				}
 
 				unstructuredObj.SetResourceVersion(existing.GetResourceVersion())
