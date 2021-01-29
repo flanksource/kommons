@@ -41,6 +41,11 @@ func Walk(path string) (Specs, error) {
 			logger.Errorf("Error decoding %s: %v", path, err)
 			return nil
 		}
+		items, err = Unwrap(items)
+		if err != nil {
+			return nil
+		}
+
 		specs = append(specs, Spec{
 			Path:  path,
 			Items: items,
@@ -49,6 +54,23 @@ func Walk(path string) (Specs, error) {
 	})
 
 	return specs, err
+}
+
+func Unwrap(list []unstructured.Unstructured) ([]unstructured.Unstructured, error) {
+	var items []unstructured.Unstructured
+	for _, item := range list {
+		if item.IsList() {
+
+			children, err := item.ToList()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, children.Items...)
+		} else {
+			items = append(items, item)
+		}
+	}
+	return items, nil
 }
 
 func (specs Specs) FilterBy(kind string) []unstructured.Unstructured {
