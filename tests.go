@@ -2,7 +2,9 @@ package kommons
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
+	"strings"
 
 	"github.com/flanksource/commons/console"
 	v1 "k8s.io/api/core/v1"
@@ -29,12 +31,25 @@ func TestDeploy(client kubernetes.Interface, ns string, deploymentName string, t
 	if len(pods.Items) == 0 {
 		t.Failf(deploymentName, "No pods found for %s", deploymentName)
 	}
+	fails := make([]error, 0)
 	for _, pod := range pods.Items {
-		TestPod(deploymentName, client, events, pod, t)
+		err = TestPod(deploymentName, client, events, pod)
+		if err != nil {
+			fails = append(fails, err)
+		}
 	}
+	if len(fails) > 0 {
+		message := fmt.Sprintf("%d of %d pods failed: ", len(fails), len(pods.Items))
+		for _, err := range fails {
+			message += err.Error() + ". "
+		}
+		message = strings.TrimSuffix(message, " ")
+		t.Failf(deploymentName, message)
+	}
+	t.Passf(deploymentName, "%d of %d pods passed", len(pods.Items), len(pods.Items))
 }
 
-func TestPod(testName string, client kubernetes.Interface, events typedv1.EventInterface, pod v1.Pod, t *console.TestResults) {
+func TestPod(testName string, client kubernetes.Interface, events typedv1.EventInterface, pod v1.Pod) error {
 	conditions := true
 	// for _, condition := range pod.Status.Conditions {
 	// 	if condition.Status == v1.ConditionFalse {
@@ -43,14 +58,14 @@ func TestPod(testName string, client kubernetes.Interface, events typedv1.EventI
 	// 	}
 	// }
 	if conditions && pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded {
-		t.Passf(testName, "%s => %s", pod.Name, pod.Status.Phase)
+		return nil
 	} else {
 		events, err := events.List(context.TODO(), metav1.ListOptions{
 			FieldSelector: "involvedObject.name=" + pod.Name,
 		})
 		if err != nil {
-			t.Failf(testName, "%s => %s, failed to get events %+v ", pod.Name, pod.Status.Phase, err)
-			return
+			return goerrors.New(fmt.Sprintf("%s => %s, failed to get events %+v",
+				pod.Name, pod.Status.Phase, err))
 		}
 		msg := ""
 		for _, event := range events.Items {
@@ -59,7 +74,7 @@ func TestPod(testName string, client kubernetes.Interface, events typedv1.EventI
 			}
 			msg += fmt.Sprintf("%s: %s ", event.Reason, event.Message)
 		}
-		t.Failf(testName, "%s/%s=%s %s ", pod.Namespace, pod.Name, pod.Status.Phase, msg)
+		return goerrors.New(fmt.Sprintf("%s/%s=%s %s ", pod.Namespace, pod.Name, pod.Status.Phase, msg))
 	}
 
 	// check all pods running or completed with < 3 restarts
@@ -72,7 +87,7 @@ func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResult
 	events := client.CoreV1().Events(ns)
 	list, err := pods.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		t.Failf("Failed to get pods for %s: %v", ns, err)
+		t.Failf(ns, "Failed to get pods for %s: %v", ns, err)
 		return
 	}
 
@@ -83,8 +98,22 @@ func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResult
 		} else {
 			t.Failf(ns, "[%s] Expected pods but none running - did you deploy?", ns)
 		}
+		return
 	}
+	fails := make([]error, 0)
 	for _, pod := range list.Items {
-		TestPod(ns, client, events, pod, t)
+		err = TestPod(ns, client, events, pod)
+		if err != nil {
+			fails = append(fails, err)
+		}
 	}
+	if len(fails) > 0 {
+		message := fmt.Sprintf("%d of %d pods failed: ", len(fails), len(list.Items))
+		for _, err := range fails {
+			message += err.Error() + ". "
+		}
+		message = strings.TrimSuffix(message, " ")
+		t.Failf(ns, message)
+	}
+	t.Passf(ns, "%d of %d pods passed", len(list.Items), len(list.Items))
 }
