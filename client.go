@@ -702,7 +702,7 @@ func (c *Client) ApplyUnstructured(namespace string, objects ...*unstructured.Un
 
 				updated, err := client.Replace(namespace, unstructuredObj.GetName(), true, unstructuredObj)
 				if err != nil {
-					c.Errorf("error handling: %s : %+v", client.Resource, err)
+					return perrors.Wrapf(err, "error handling: %s", client.Resource)
 				} else {
 					updatedUnstructured := updated.(*unstructured.Unstructured)
 					if updatedUnstructured.GetResourceVersion() == unstructuredObj.GetResourceVersion() {
@@ -733,7 +733,7 @@ func (c *Client) ApplyUnstructured(namespace string, objects ...*unstructured.Un
 			} else if err == nil {
 				c.Infof("%s/%s/%s created", client.Resource, unstructuredObj.GetNamespace(), unstructuredObj.GetName())
 			} else {
-				c.Errorf("error handling: %s : %+v", client.Resource, err)
+				return perrors.Wrapf(err, "error handling: %s", client.Resource)
 			}
 		}
 	}
