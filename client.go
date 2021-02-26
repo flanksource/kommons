@@ -202,7 +202,7 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 		}
 		patchData, err = templatizePatch(patchData)
 		if err != nil {
-			return nil, err
+			return nil, perrors.WithMessagef(err, "syntax error when reading %s ", name)
 		}
 		if c.Trace {
 			c.Tracef("patch file %v after templating:\n%v\n\n", name, string(*patchData))
@@ -521,7 +521,7 @@ func (c *Client) GetClientByKind(kind string) (dynamic.NamespaceableResourceInte
 func (c *Client) GetDynamicClientFor(namespace string, obj runtime.Object) (dynamic.ResourceInterface, *schema.GroupVersionResource, *unstructured.Unstructured, error) {
 	dynamicClient, err := c.GetDynamicClient()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getDynamicClientFor: failed to get dynamic client: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get dynamic client")
 	}
 
 	return c.getDynamicClientFor(dynamicClient, namespace, obj)
@@ -530,7 +530,7 @@ func (c *Client) GetDynamicClientFor(namespace string, obj runtime.Object) (dyna
 func (c *Client) GetDynamicClientForUser(namespace string, obj runtime.Object, user string) (dynamic.ResourceInterface, *schema.GroupVersionResource, *unstructured.Unstructured, error) {
 	data, err := c.GetKubeConfigBytes()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getRESTConfig: failed to get kubeconfig: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get kubeconfig")
 	}
 	if len(data) == 0 {
 		return nil, nil, nil, fmt.Errorf("kubeConfig is empty")
@@ -538,18 +538,18 @@ func (c *Client) GetDynamicClientForUser(namespace string, obj runtime.Object, u
 
 	cfg, err := clientcmd.RESTConfigFromKubeConfig(data)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getClientset: failed to get REST config: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get RestConfig")
 	}
 
 	impersonate := transport.ImpersonationConfig{UserName: user}
 
 	transportConfig, err := cfg.TransportConfig()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get transport config: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get TransportConfig")
 	}
 	tlsConfig, err := transport.TLSConfigFor(transportConfig)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get tls config: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get TLSConfig")
 	}
 	timeout := 5 * time.Second
 
@@ -571,7 +571,7 @@ func (c *Client) GetDynamicClientForUser(namespace string, obj runtime.Object, u
 	cfg.TLSClientConfig = rest.TLSClientConfig{}
 	dynamicClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get dynamic from config: %v", err)
+		return nil, nil, nil, perrors.Wrap(err, "failed to get imporsonating config")
 	}
 
 	return c.getDynamicClientFor(dynamicClient, namespace, obj)
@@ -598,7 +598,7 @@ func (c *Client) getDynamicClientFor(dynamicClient dynamic.Interface, namespace 
 
 	convertedObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getDynamicClientFor: failed to convert object: %v", err)
+		return nil, nil, nil, perrors.Wrapf(err, "failed to convert %s", obj.GetObjectKind())
 	}
 
 	unstructuredObj := &unstructured.Unstructured{Object: convertedObj}
@@ -783,7 +783,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				c.Debugf("[dry-run] failed to get dynamic client for namespace %s", namespace)
 				continue
 			}
-			return fmt.Errorf("failed to get dynamic client for %v: %v", obj, err)
+			return perrors.Wrapf(err, "failed to get dynamic client from %s", obj.GetObjectKind())
 		}
 
 		if c.ApplyHook != nil {
@@ -888,7 +888,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 func (c *Client) Annotate(obj runtime.Object, annotations map[string]string) error {
 	client, resource, unstructuredObj, err := c.GetDynamicClientFor("", obj)
 	if err != nil {
-		return fmt.Errorf("annotate: failed to get dynamic client: %s", err)
+		return err
 	}
 	existing := unstructuredObj.GetAnnotations()
 	for k, v := range annotations {
@@ -906,7 +906,7 @@ func (c *Client) Annotate(obj runtime.Object, annotations map[string]string) err
 func (c *Client) Label(obj runtime.Object, labels map[string]string) error {
 	client, resource, unstructuredObj, err := c.GetDynamicClientFor("", obj)
 	if err != nil {
-		return fmt.Errorf("label: failed to get dynamic client: %v", err)
+		return err
 	}
 	existing := unstructuredObj.GetLabels()
 	for k, v := range labels {
@@ -923,7 +923,7 @@ func (c *Client) Label(obj runtime.Object, labels map[string]string) error {
 func (c *Client) CreateOrUpdateNamespace(name string, labels, annotations map[string]string) error {
 	k8s, err := c.GetClientset()
 	if err != nil {
-		return fmt.Errorf("createOrUpdateNamespace: failed to get client set: %v", err)
+		return err
 	}
 
 	ns := k8s.CoreV1().Namespaces()
