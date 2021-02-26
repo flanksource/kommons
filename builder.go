@@ -1,6 +1,7 @@
 package kommons
 
 import (
+	admission "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -471,4 +472,128 @@ func (s *ServiceAccountBuilder) AddClusterRole(role string) *ServiceAccountBuild
 		},
 	})
 	return s
+}
+
+type WebhookConfigBuilder struct {
+	admission.ValidatingWebhookConfiguration
+	CA []byte
+}
+
+func (b WebhookConfigBuilder) BuildValidating(namespace, name string) *admission.ValidatingWebhookConfiguration {
+	b.ValidatingWebhookConfiguration.ObjectMeta = metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      name,
+	}
+	b.ValidatingWebhookConfiguration.TypeMeta = metav1.TypeMeta{
+		Kind:       "ValidatingWebhookConfiguration",
+		APIVersion: "admissionregistration.k8s.io/v1",
+	}
+	return &b.ValidatingWebhookConfiguration
+
+}
+
+func (b WebhookConfigBuilder) NewHook(Namespace, Service, Name, Path string) WebhookBuilder {
+	ignore := admission.Ignore
+	none := admission.SideEffectClassNone
+	five := int32(5)
+	return WebhookBuilder{
+		ValidatingWebhook: admission.ValidatingWebhook{
+			Name:                    Name,
+			FailurePolicy:           &ignore,
+			SideEffects:             &none,
+			TimeoutSeconds:          &five,
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		CA:                   b.CA,
+		Namespace:            Namespace,
+		Service:              Service,
+		Path:                 Path,
+		WebhookConfigBuilder: b,
+	}
+
+}
+
+type WebhookBuilder struct {
+	WebhookConfigBuilder
+	admission.ValidatingWebhook
+	CA                       []byte
+	Namespace, Service, Path string
+}
+
+func (b WebhookBuilder) WithNamespaceLabel(label string, values ...string) WebhookBuilder {
+	op := metav1.LabelSelectorOpIn
+	if len(values) == 0 {
+		op = metav1.LabelSelectorOpExists
+	}
+	b.NamespaceSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      label,
+				Operator: op,
+				Values:   values,
+			},
+		},
+	}
+	return b
+}
+
+func (b WebhookBuilder) WithoutNamespaceLabel(label string, values ...string) WebhookBuilder {
+	op := metav1.LabelSelectorOpNotIn
+	if len(values) == 0 {
+		op = metav1.LabelSelectorOpDoesNotExist
+	}
+	b.NamespaceSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      label,
+				Operator: op,
+				Values:   values,
+			},
+		},
+	}
+	return b
+}
+
+func (b WebhookBuilder) Match(groups, versions, resources []string) WebhookBuilder {
+	b.Rules = append(b.Rules, admission.RuleWithOperations{
+		Operations: []admission.OperationType{admission.Create, admission.Update},
+		Rule: admission.Rule{
+			APIGroups:   groups,
+			APIVersions: versions,
+			Resources:   resources,
+		},
+	})
+	return b
+}
+
+func (b WebhookBuilder) Fail() WebhookBuilder {
+	fail := admission.Fail
+	b.FailurePolicy = &fail
+	return b
+}
+
+func (b WebhookBuilder) TimeoutSeconds(timeout int32) WebhookBuilder {
+	b.ValidatingWebhook.TimeoutSeconds = &timeout
+	return b
+}
+
+func (b WebhookBuilder) MatchKinds(resources ...string) WebhookBuilder {
+	return b.Match([]string{"*"}, []string{"*"}, resources)
+}
+
+func (b WebhookBuilder) MatchAny() WebhookBuilder {
+	return b.Match([]string{"*"}, []string{"*"}, []string{"*"})
+}
+
+func (b WebhookBuilder) Add() WebhookConfigBuilder {
+	b.ValidatingWebhook.ClientConfig = admission.WebhookClientConfig{
+		CABundle: b.CA,
+		Service: &admission.ServiceReference{
+			Namespace: b.Namespace,
+			Name:      b.Service,
+			Path:      &b.Path,
+		},
+	}
+	b.WebhookConfigBuilder.Webhooks = append(b.WebhookConfigBuilder.Webhooks, b.ValidatingWebhook)
+	return b.WebhookConfigBuilder
 }
