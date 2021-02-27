@@ -1642,6 +1642,22 @@ func (c *Client) PingMaster() bool {
 	return true
 }
 
+func (c *Client) GetByKind(kind, namespace, name string) (*unstructured.Unstructured, error) {
+	client, err := c.GetClientByKind(kind)
+	if err != nil {
+		return nil, err
+	}
+	item, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	if errors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) error {
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
@@ -1661,6 +1677,11 @@ func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Dura
 
 		if err != nil {
 			c.Debugf("Unable to get %s/%s: %v", kind, name, err)
+			c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
+			continue
+		}
+		if item.Object["status"] == nil {
+			c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
 			continue
 		}
 
@@ -1673,6 +1694,7 @@ func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Dura
 				return nil
 			}
 		}
+		c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -1728,7 +1750,7 @@ func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error
 		}
 
 		if !msg {
-			c.Infof("waiting for %s/%s to have 1 ready replica", ns, name)
+			c.Infof("Waiting for %s/%s to have 1 ready replica", ns, name)
 			msg = true
 		}
 
