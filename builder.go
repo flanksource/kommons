@@ -476,14 +476,11 @@ func (s *ServiceAccountBuilder) AddClusterRole(role string) *ServiceAccountBuild
 
 type WebhookConfigBuilder struct {
 	admission.ValidatingWebhookConfiguration
-	CA []byte
+	Service string
+	CA      []byte
 }
 
-func (b WebhookConfigBuilder) BuildValidating(namespace, name string) *admission.ValidatingWebhookConfiguration {
-	b.ValidatingWebhookConfiguration.ObjectMeta = metav1.ObjectMeta{
-		Namespace: namespace,
-		Name:      name,
-	}
+func (b WebhookConfigBuilder) Build() *admission.ValidatingWebhookConfiguration {
 	b.ValidatingWebhookConfiguration.TypeMeta = metav1.TypeMeta{
 		Kind:       "ValidatingWebhookConfiguration",
 		APIVersion: "admissionregistration.k8s.io/v1",
@@ -492,11 +489,11 @@ func (b WebhookConfigBuilder) BuildValidating(namespace, name string) *admission
 
 }
 
-func (b WebhookConfigBuilder) NewHook(Namespace, Service, Name, Path string) WebhookBuilder {
+func (b *WebhookConfigBuilder) NewHook(Name, Path string) *WebhookBuilder {
 	ignore := admission.Ignore
 	none := admission.SideEffectClassNone
 	five := int32(5)
-	return WebhookBuilder{
+	return &WebhookBuilder{
 		ValidatingWebhook: admission.ValidatingWebhook{
 			Name:                    Name,
 			FailurePolicy:           &ignore,
@@ -505,19 +502,17 @@ func (b WebhookConfigBuilder) NewHook(Namespace, Service, Name, Path string) Web
 			AdmissionReviewVersions: []string{"v1beta1"},
 		},
 		CA:                   b.CA,
-		Namespace:            Namespace,
-		Service:              Service,
+		Service:              b.Service,
 		Path:                 Path,
 		WebhookConfigBuilder: b,
 	}
-
 }
 
 type WebhookBuilder struct {
-	WebhookConfigBuilder
+	*WebhookConfigBuilder
 	admission.ValidatingWebhook
-	CA                       []byte
-	Namespace, Service, Path string
+	CA            []byte
+	Service, Path string
 }
 
 func (b WebhookBuilder) WithNamespaceLabel(label string, values ...string) WebhookBuilder {
@@ -585,12 +580,12 @@ func (b WebhookBuilder) MatchAny() WebhookBuilder {
 	return b.Match([]string{"*"}, []string{"*"}, []string{"*"})
 }
 
-func (b WebhookBuilder) Add() WebhookConfigBuilder {
+func (b WebhookBuilder) Add() *WebhookConfigBuilder {
 	b.ValidatingWebhook.ClientConfig = admission.WebhookClientConfig{
 		CABundle: b.CA,
 		Service: &admission.ServiceReference{
-			Namespace: b.Namespace,
-			Name:      b.Service,
+			Namespace: b.WebhookConfigBuilder.Namespace,
+			Name:      b.WebhookConfigBuilder.Name,
 			Path:      &b.Path,
 		},
 	}
