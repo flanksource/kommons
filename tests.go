@@ -16,40 +16,71 @@ import (
 )
 
 func TestDeploy(client kubernetes.Interface, ns string, deploymentName string, t *console.TestResults) {
-	events := client.CoreV1().Events(ns)
+	if client == nil {
+		t.Failf(deploymentName, "failed to get kubernetes client")
+		return
+	}
+
 	deployment, err := client.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		t.Skipf(deploymentName, "deployment not found")
 		return
 	}
 	labelMap, _ := metav1.LabelSelectorAsMap(deployment.Spec.Selector)
+	TestPodsByLabels(client, deploymentName, ns, labelMap, t)
+}
 
+func TestDaemonSet(client kubernetes.Interface, ns string, name string, t *console.TestResults) {
+	testName := name
+	if client == nil {
+		t.Failf(testName, "failed to get kubernetes client")
+		return
+	}
+	daemonset, err := client.AppsV1().DaemonSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		t.Failf(testName, "daemonset not found")
+		return
+	}
+
+	labelMap, _ := metav1.LabelSelectorAsMap(daemonset.Spec.Selector)
+	TestPodsByLabels(client, testName, ns, labelMap, t)
+}
+
+func TestPodsByLabels(client kubernetes.Interface, testName string, ns string, labelMap map[string]string, t *console.TestResults) {
+	if client == nil {
+		t.Failf(testName, "failed to get kubernetes client")
+		return
+	}
+	events := client.CoreV1().Events(ns)
 	pods, _ := client.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labelMap).String(),
 	})
 
 	if len(pods.Items) == 0 {
-		t.Failf(deploymentName, "No pods found for %s", deploymentName)
+		t.Failf(testName, "No pods found for %s", testName)
+		return
 	}
 	fails := make([]error, 0)
 	for _, pod := range pods.Items {
-		err = TestPod(deploymentName, client, events, pod)
-		if err != nil {
+		if err := TestPod(testName, client, events, pod); err != nil {
 			fails = append(fails, err)
 		}
 	}
 	if len(fails) > 0 {
-		message := fmt.Sprintf("%d of %d pods failed: ", len(fails), len(pods.Items))
+		message := fmt.Sprintf("[%s] %d of %d pods failed: ", testName, len(fails), len(pods.Items))
 		for _, err := range fails {
 			message += err.Error() + ". "
 		}
 		message = strings.TrimSuffix(message, " ")
-		t.Failf(deploymentName, message)
+		t.Failf(testName, message)
 	}
-	t.Passf(deploymentName, "%d of %d pods passed", len(pods.Items), len(pods.Items))
+	t.Passf(testName, "[%s] %d of %d pods passed", testName, len(pods.Items), len(pods.Items))
 }
 
 func TestPod(testName string, client kubernetes.Interface, events typedv1.EventInterface, pod v1.Pod) error {
+	if client == nil {
+		return fmt.Errorf("%s: failed to get kubernetes client", testName)
+	}
 	conditions := true
 	// for _, condition := range pod.Status.Conditions {
 	// 	if condition.Status == v1.ConditionFalse {
@@ -83,6 +114,10 @@ func TestPod(testName string, client kubernetes.Interface, events typedv1.EventI
 }
 
 func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResults) {
+	if client == nil {
+		t.Failf(ns, "failed to get kubernetes client")
+		return
+	}
 	pods := client.CoreV1().Pods(ns)
 	events := client.CoreV1().Events(ns)
 	list, err := pods.List(context.TODO(), metav1.ListOptions{})
@@ -108,12 +143,12 @@ func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResult
 		}
 	}
 	if len(fails) > 0 {
-		message := fmt.Sprintf("%d of %d pods failed: ", len(fails), len(list.Items))
+		message := fmt.Sprintf("[%s] %d of %d pods failed: ", ns, len(fails), len(list.Items))
 		for _, err := range fails {
 			message += err.Error() + ". "
 		}
 		message = strings.TrimSuffix(message, " ")
 		t.Failf(ns, message)
 	}
-	t.Passf(ns, "%d of %d pods passed", len(list.Items), len(list.Items))
+	t.Passf(ns, "[%s] %d of %d pods passed", ns, len(list.Items), len(list.Items))
 }
