@@ -489,6 +489,29 @@ func (b WebhookConfigBuilder) Build() *admission.ValidatingWebhookConfiguration 
 
 }
 
+func (b WebhookConfigBuilder) BuildMutating() *admission.MutatingWebhookConfiguration {
+	webhooks := []admission.MutatingWebhook{}
+	for _, webhook := range b.Webhooks {
+		webhooks = append(webhooks, admission.MutatingWebhook{
+			Name:                    webhook.Name,
+			FailurePolicy:           webhook.FailurePolicy,
+			SideEffects:             webhook.SideEffects,
+			TimeoutSeconds:          webhook.TimeoutSeconds,
+			AdmissionReviewVersions: webhook.AdmissionReviewVersions,
+			ClientConfig:            webhook.ClientConfig,
+			Rules:                   webhook.Rules,
+		})
+	}
+	return &admission.MutatingWebhookConfiguration{
+		ObjectMeta: b.ValidatingWebhookConfiguration.ObjectMeta,
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MutatingWebhookConfiguration",
+			APIVersion: "admissionregistration.k8s.io/v1",
+		},
+		Webhooks: webhooks,
+	}
+}
+
 func (b *WebhookConfigBuilder) NewHook(Name, Path string) *WebhookBuilder {
 	ignore := admission.Ignore
 	none := admission.SideEffectClassNone
