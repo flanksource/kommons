@@ -49,6 +49,15 @@ func (c *Client) ApplyUnstructured(namespace string, objects ...*unstructured.Un
 					spec["clusterIP"] = existing.Object["spec"].(map[string]interface{})["clusterIP"]
 				} else if unstructuredObj.GetKind() == "ServiceAccount" {
 					unstructuredObj.Object["secrets"] = existing.Object["secrets"]
+				} else if unstructuredObj.GetKind() == "PersistentVolumeClaim" {
+					resourcesRequests, found, err := unstructured.NestedFieldCopy(unstructuredObj.Object, "spec", "resources", "requests")
+					if err != nil {
+						c.Errorf("Failed to get spec.resources.requests of %s/%s/%s", client.Resource, unstructuredObj.GetNamespace(), unstructuredObj.GetName())
+					}
+					unstructuredObj.Object["spec"] = existing.Object["spec"]
+					if found {
+						unstructured.SetNestedField(unstructuredObj.Object, resourcesRequests, "spec", "resources", "requests")
+					}
 				}
 				for _, immutable := range c.ImmutableAnnotations {
 					if existing, ok := existing.GetAnnotations()[immutable]; ok {
@@ -158,6 +167,15 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				spec["clusterIP"] = existing.Object["spec"].(map[string]interface{})["clusterIP"]
 			} else if unstructuredObj.GetKind() == "ServiceAccount" {
 				unstructuredObj.Object["secrets"] = existing.Object["secrets"]
+			} else if unstructuredObj.GetKind() == "PersistentVolumeClaim" {
+				resourcesRequests, found, err := unstructured.NestedFieldCopy(unstructuredObj.Object, "spec", "resources", "requests")
+				if err != nil {
+					c.Errorf("Failed to get spec.resources.requests of %s/%s/%s", resource.Resource, unstructuredObj.GetNamespace(), unstructuredObj.GetName())
+				}
+				unstructuredObj.Object["spec"] = existing.Object["spec"]
+				if found {
+					unstructured.SetNestedField(unstructuredObj.Object, resourcesRequests, "spec", "resources", "requests")
+				}
 			}
 			// apps/DameonSet MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 			// webhook CA's
