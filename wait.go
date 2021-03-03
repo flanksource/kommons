@@ -110,6 +110,34 @@ func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error
 	}
 }
 
+// WaitForStatefulSet waits for a statefulset to have at least 1 ready replica, or returns an
+// error if the timeout is exceeded
+func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) error {
+	client, err := c.GetClientset()
+	if err != nil {
+		return err
+	}
+	statefulsets := client.AppsV1().StatefulSets(ns)
+	start := time.Now()
+	msg := false
+	for {
+		statefulset, _ := statefulsets.Get(context.TODO(), name, metav1.GetOptions{})
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("timeout exceeded waiting for statefulset to become ready %s", name)
+		}
+		if statefulset != nil && statefulset.Status.ReadyReplicas >= 1 {
+			return nil
+		}
+
+		if !msg {
+			c.Infof("Waiting for %s/%s to have 1 ready replica", ns, name)
+			msg = true
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+
 // WaitForNode waits for a pod to be in the specified phase, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForNode(name string, timeout time.Duration, condition v1.NodeConditionType, statii ...v1.ConditionStatus) (map[v1.NodeConditionType]v1.ConditionStatus, error) {
