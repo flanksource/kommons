@@ -41,7 +41,11 @@ import (
 	"k8s.io/client-go/transport"
 )
 
-var immutableAnnotations = []string{"cnrm.cloud.google.com/project-id"}
+var immutableAnnotations = []string{
+	"cnrm.cloud.google.com/project-id",
+	"deployment.kubernetes.io/revision",
+	"flux.weave.works/sync-hwm",
+}
 
 type Client struct {
 	logger.Logger
@@ -94,7 +98,7 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 	if c.kustomizeManager != nil {
 		return c.kustomizeManager, nil
 	}
-	dir, _ := ioutil.TempDir("", "platform-cli-kustomize")
+	dir, _ := ioutil.TempDir("", "karina-kustomize")
 	patches, err := c.GetKustomizePatches()
 	if err != nil {
 		return nil, err

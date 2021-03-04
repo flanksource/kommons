@@ -44,7 +44,6 @@ func (c *Client) CreateOrUpdateNamespace(name string, labels, annotations map[st
 		cm.Labels = labels
 		cm.Annotations = annotations
 
-		c.Debugf("Creating namespace %s", name)
 		if !c.ApplyDryRun {
 			if _, err := ns.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 				return err
@@ -71,7 +70,6 @@ func (c *Client) CreateOrUpdateNamespace(name string, labels, annotations map[st
 	(*cm).Labels = labels
 	(*cm).Annotations = annotations
 	if !c.ApplyDryRun {
-		c.Debugf("Updating namespace %s", name)
 		if _, err := ns.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
 			return err
 		}

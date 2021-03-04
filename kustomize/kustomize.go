@@ -172,14 +172,20 @@ func (km *Manager) loadFromFolder(ldr ifc.Loader) error {
 
 // Kustomize apply a set of patches to a resource.
 // Portions of the kustomize logic in this function are taken from the kubernetes-sigs/kind project
-func (km *Manager) Kustomize(namespace string, data []byte) ([]runtime.Object, error) {
-	raw, err := getUnstructuredObjects(data)
-	var kustomized []runtime.Object
+func (km *Manager) KustomizeRaw(namespace string, data []byte) ([]runtime.Object, error) {
+	raw, err := GetUnstructuredObjects(data)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, _resource := range raw {
+	return km.Kustomize(namespace, raw...)
+}
+
+// Kustomize apply a set of patches to a resource.
+// Portions of the kustomize logic in this function are taken from the kubernetes-sigs/kind project
+func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]runtime.Object, error) {
+	var kustomized []runtime.Object
+	for _, _resource := range objects {
 		resource := _resource.(*unstructured.Unstructured)
 
 		if resource == nil {
@@ -255,7 +261,7 @@ func (km *Manager) Kustomize(namespace string, data []byte) ([]runtime.Object, e
 			return nil, err
 		}
 
-		objects, err := getUnstructuredObjects(out.Bytes())
+		objects, err := GetUnstructuredObjects(out.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +270,7 @@ func (km *Manager) Kustomize(namespace string, data []byte) ([]runtime.Object, e
 	return kustomized, nil
 }
 
-func getUnstructuredObjects(data []byte) ([]runtime.Object, error) {
+func GetUnstructuredObjects(data []byte) ([]runtime.Object, error) {
 	var items []runtime.Object
 
 	for _, chunk := range strings.Split(string(data), "---\n") {
@@ -277,7 +283,9 @@ func getUnstructuredObjects(data []byte) ([]runtime.Object, error) {
 		if err := decoder.Decode(&resource); err != nil {
 			return nil, fmt.Errorf("error decoding %s: %s", chunk, err)
 		}
-		items = append(items, resource)
+		if resource != nil {
+			items = append(items, resource)
+		}
 	}
 
 	return items, nil

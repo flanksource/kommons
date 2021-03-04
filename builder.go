@@ -481,6 +481,7 @@ type WebhookConfigBuilder struct {
 }
 
 func (b WebhookConfigBuilder) Build() *admission.ValidatingWebhookConfiguration {
+	b.ValidatingWebhookConfiguration.ObjectMeta.Namespace = ""
 	b.ValidatingWebhookConfiguration.TypeMeta = metav1.TypeMeta{
 		Kind:       "ValidatingWebhookConfiguration",
 		APIVersion: "admissionregistration.k8s.io/v1",
@@ -491,17 +492,24 @@ func (b WebhookConfigBuilder) Build() *admission.ValidatingWebhookConfiguration 
 
 func (b WebhookConfigBuilder) BuildMutating() *admission.MutatingWebhookConfiguration {
 	webhooks := []admission.MutatingWebhook{}
+	never := admission.NeverReinvocationPolicy
 	for _, webhook := range b.Webhooks {
 		webhooks = append(webhooks, admission.MutatingWebhook{
 			Name:                    webhook.Name,
 			FailurePolicy:           webhook.FailurePolicy,
 			SideEffects:             webhook.SideEffects,
 			TimeoutSeconds:          webhook.TimeoutSeconds,
+			MatchPolicy:             webhook.MatchPolicy,
+			NamespaceSelector:       webhook.NamespaceSelector,
+			ObjectSelector:          webhook.ObjectSelector,
+			ReinvocationPolicy:      &never,
 			AdmissionReviewVersions: webhook.AdmissionReviewVersions,
 			ClientConfig:            webhook.ClientConfig,
 			Rules:                   webhook.Rules,
 		})
 	}
+	b.ValidatingWebhookConfiguration.ObjectMeta.Namespace = ""
+
 	return &admission.MutatingWebhookConfiguration{
 		ObjectMeta: b.ValidatingWebhookConfiguration.ObjectMeta,
 		TypeMeta: metav1.TypeMeta{
@@ -514,13 +522,18 @@ func (b WebhookConfigBuilder) BuildMutating() *admission.MutatingWebhookConfigur
 
 func (b *WebhookConfigBuilder) NewHook(Name, Path string) *WebhookBuilder {
 	ignore := admission.Ignore
+	equivalent := admission.Equivalent
 	none := admission.SideEffectClassNone
+
 	five := int32(5)
 	return &WebhookBuilder{
 		ValidatingWebhook: admission.ValidatingWebhook{
 			Name:                    Name,
 			FailurePolicy:           &ignore,
 			SideEffects:             &none,
+			MatchPolicy:             &equivalent,
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
 			TimeoutSeconds:          &five,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		},
@@ -573,9 +586,12 @@ func (b WebhookBuilder) WithoutNamespaceLabel(label string, values ...string) We
 }
 
 func (b WebhookBuilder) Match(groups, versions, resources []string) WebhookBuilder {
+	all := admission.AllScopes
 	b.Rules = append(b.Rules, admission.RuleWithOperations{
 		Operations: []admission.OperationType{admission.Create, admission.Update},
+
 		Rule: admission.Rule{
+			Scope:       &all,
 			APIGroups:   groups,
 			APIVersions: versions,
 			Resources:   resources,
@@ -610,6 +626,7 @@ func (b WebhookBuilder) Add() *WebhookConfigBuilder {
 			Namespace: b.WebhookConfigBuilder.Namespace,
 			Name:      b.WebhookConfigBuilder.Name,
 			Path:      &b.Path,
+			Port:      intPtr(443),
 		},
 	}
 	b.WebhookConfigBuilder.Webhooks = append(b.WebhookConfigBuilder.Webhooks, b.ValidatingWebhook)

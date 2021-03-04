@@ -2,59 +2,197 @@ package kommons
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	"github.com/flanksource/commons/console"
-	log "github.com/sirupsen/logrus"
 	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/yaml"
+	"strings"
+	"time"
 )
+
+func ToJson(to *unstructured.Unstructured) string {
+	data, _ := to.MarshalJSON()
+	return string(data)
+}
+
+func ToYaml(to *unstructured.Unstructured) string {
+	data, _ := yaml.Marshal(to)
+	return string(data)
+}
+
+func AsDeployment(obj *unstructured.Unstructured) (*appsv1.Deployment, error) {
+	var deployment appsv1.Deployment
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment); err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}
+
+func AsService(obj *unstructured.Unstructured) (*v1.Service, error) {
+	var svc v1.Service
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &svc); err != nil {
+		return nil, err
+	}
+	return &svc, nil
+}
+
+func AsIngress(obj *unstructured.Unstructured) (*networking.Ingress, error) {
+	var ing networking.Ingress
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &ing); err != nil {
+		return nil, err
+	}
+	return &ing, nil
+}
+
+func AsRoleBinding(obj *unstructured.Unstructured) (*rbac.RoleBinding, error) {
+	var rb rbac.RoleBinding
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &rb); err != nil {
+		return nil, err
+	}
+	return &rb, nil
+}
+
+func AsClusterRoleBinding(obj *unstructured.Unstructured) (*rbac.ClusterRoleBinding, error) {
+	var crb rbac.ClusterRoleBinding
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crb); err != nil {
+		return nil, err
+	}
+	return &crb, nil
+}
+
+func AsDaemonSet(obj *unstructured.Unstructured) (*appsv1.DaemonSet, error) {
+	var daemonset appsv1.DaemonSet
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &daemonset); err != nil {
+		return nil, err
+	}
+	return &daemonset, nil
+}
+
+func AsCustomResourceDefinition(obj *unstructured.Unstructured) (*apiextensions.CustomResourceDefinition, error) {
+	var crd apiextensions.CustomResourceDefinition
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crd); err != nil {
+		return nil, err
+	}
+	return &crd, nil
+}
+
+func AsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	var crd apiextensionsv1beta1.CustomResourceDefinition
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crd); err != nil {
+		return nil, err
+	}
+	return &crd, nil
+}
+
+func AsPodTemplate(obj *unstructured.Unstructured) (*v1.PodTemplateSpec, error) {
+	var spec v1.PodTemplateSpec
+	template, _, err := unstructured.NestedMap(obj.Object, "spec", "template")
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(template, &spec); err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
 
 func GetValidName(name string) string {
 	return strings.ReplaceAll(name, "_", "-")
 }
 
-func WaitForNamespace(client kubernetes.Interface, ns string, timeout time.Duration) {
-	pods := client.CoreV1().Pods(ns)
-	start := time.Now()
-	for {
-		ready := 0
-		pending := 0
-		list, _ := pods.List(context.TODO(), metav1.ListOptions{})
-		for _, pod := range list.Items {
-			conditions := true
-			for _, condition := range pod.Status.Conditions {
-				if condition.Status == v1.ConditionFalse {
-					conditions = false
-				}
-			}
-			if conditions && (pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded) {
-				ready++
-			} else {
-				pending++
-			}
-		}
-		if ready > 0 && pending == 0 {
-			return
-		}
-		log.Debugf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
-		if start.Add(timeout).Before(time.Now()) {
-			log.Warnf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
-			return
-		}
-		time.Sleep(10 * time.Second)
-	}
+func GetName(obj *unstructured.Unstructured) string {
+	return fmt.Sprintf("%s/%s/%s", console.Bluef(obj.GetKind()), console.Grayf(obj.GetNamespace()), console.LightWhitef(obj.GetName()))
 }
 
+func IsNil(object runtime.Object) bool {
+	if object == nil {
+		return true
+	}
+	switch object.(type) {
+	case *unstructured.Unstructured:
+		obj := object.(*unstructured.Unstructured)
+		if obj == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func Validate(object runtime.Object) error {
+	switch object.(type) {
+	case *unstructured.Unstructured:
+		obj := object.(*unstructured.Unstructured)
+		if obj == nil {
+			return fmt.Errorf("empty pointer")
+		}
+		if obj.GetKind() == "" {
+			return fmt.Errorf("%s/%s does not have a kind", obj.GetNamespace(), obj.GetName())
+		}
+		if obj.GetAPIVersion() == "" {
+			return fmt.Errorf("%s/%s/%s does not have an apiVersion", obj.GetNamespace(), obj.GetKind(), obj.GetName())
+		}
+
+	}
+	return nil
+}
+
+func IsSecret(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Secret"
+}
+
+func IsPVC(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "PersistentVolumeClaim"
+}
+
+func IsService(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Service"
+}
+
+func IsServiceAccount(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "ServiceAccount"
+}
+func IsIngress(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Ingress"
+}
+
+func IsDeployment(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Deployment"
+}
+
+func IsDaemonSet(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "DaemonSet"
+}
+
+func IsAnyRoleBinding(obj *unstructured.Unstructured) bool {
+	return IsRoleBinding(obj) || IsClusterRoleBinding(obj)
+}
+
+func IsRoleBinding(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "RoleBinding"
+}
+
+func IsClusterRoleBinding(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "ClusterRoleBinding"
+}
+
+func IsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "CustomResourceDefinition" && obj.GetAPIVersion() == "apiextensions.k8s.io/v1beta1"
+}
+func IsCustomResourceDefinition(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "CustomResourceDefinition"
+}
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)
@@ -285,8 +423,8 @@ func (h Health) String() string {
 		h.RunningPods, console.Yellowf("%d", h.PendingPods), console.Redf("%d", h.CrashLoopBackOff), console.Redf("%d", h.ErrorPods), h.ReadyNodes, console.Redf("%d", h.UnreadyNodes))
 }
 
-func GetUnstructuredObjects(data []byte) ([]unstructured.Unstructured, error) {
-	var items []unstructured.Unstructured
+func GetUnstructuredObjects(data []byte) ([]*unstructured.Unstructured, error) {
+	var items []*unstructured.Unstructured
 	for _, chunk := range strings.Split(string(data), "---\n") {
 		if strings.TrimSpace(chunk) == "" {
 			continue
@@ -299,7 +437,7 @@ func GetUnstructuredObjects(data []byte) ([]unstructured.Unstructured, error) {
 			return nil, fmt.Errorf("error decoding %s: %s", chunk, err)
 		}
 		if resource != nil {
-			items = append(items, *resource)
+			items = append(items, resource)
 		}
 	}
 	return items, nil

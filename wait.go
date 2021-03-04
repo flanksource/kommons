@@ -10,12 +10,49 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
+	client, err := c.GetClientset()
+	if err != nil {
+		return err
+	}
+	pods := client.CoreV1().Pods(ns)
+	start := time.Now()
+	for {
+		ready := 0
+		pending := 0
+		list, _ := pods.List(context.TODO(), metav1.ListOptions{})
+		for _, pod := range list.Items {
+			conditions := true
+			for _, condition := range pod.Status.Conditions {
+				if condition.Status == v1.ConditionFalse {
+					conditions = false
+				}
+			}
+			if conditions && (pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded) {
+				ready++
+			} else {
+				pending++
+			}
+		}
+		if ready > 0 && pending == 0 {
+			return nil
+		}
+		c.Debugf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return nil
+}
+
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) error {
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
 		return err
 	}
 	start := time.Now()
+	var msg bool
 	for {
 		item, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 
@@ -27,13 +64,17 @@ func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Dura
 			return fmt.Errorf("timeout exceeded waiting for %s/%s is %s, error: %v", kind, name, "", err)
 		}
 
-		if err != nil {
-			c.Debugf("Unable to get %s/%s: %v", kind, name, err)
+		if !msg {
 			c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
+			msg = true
+		}
+
+		if err != nil {
+			time.Sleep(1 * time.Second)
 			continue
 		}
 		if item.Object["status"] == nil {
-			c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 

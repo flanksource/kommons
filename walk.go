@@ -13,7 +13,7 @@ import (
 type Specs []Spec
 type Spec struct {
 	Path  string
-	Items []unstructured.Unstructured
+	Items []*unstructured.Unstructured
 }
 
 // Walk iterates recursively over each file in path and
@@ -56,8 +56,8 @@ func Walk(path string) (Specs, error) {
 	return specs, err
 }
 
-func Unwrap(list []unstructured.Unstructured) ([]unstructured.Unstructured, error) {
-	var items []unstructured.Unstructured
+func Unwrap(list []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+	var items []*unstructured.Unstructured
 	for _, item := range list {
 		if item.IsList() {
 
@@ -65,7 +65,9 @@ func Unwrap(list []unstructured.Unstructured) ([]unstructured.Unstructured, erro
 			if err != nil {
 				return nil, err
 			}
-			items = append(items, children.Items...)
+			for _, child := range children.Items {
+				items = append(items, &child)
+			}
 		} else {
 			items = append(items, item)
 		}
@@ -73,8 +75,8 @@ func Unwrap(list []unstructured.Unstructured) ([]unstructured.Unstructured, erro
 	return items, nil
 }
 
-func (specs Specs) FilterBy(kind string) []unstructured.Unstructured {
-	items := []unstructured.Unstructured{}
+func (specs Specs) FilterBy(kind string) []*unstructured.Unstructured {
+	items := []*unstructured.Unstructured{}
 	for _, spec := range specs {
 		for _, item := range spec.Items {
 			if strings.EqualFold(item.GetKind(), kind) {

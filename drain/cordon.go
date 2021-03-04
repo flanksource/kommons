@@ -18,12 +18,9 @@ package drain
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -42,22 +39,6 @@ func NewCordonHelper(node *corev1.Node) *CordonHelper {
 	return &CordonHelper{
 		node: node,
 	}
-}
-
-// NewCordonHelperFromRuntimeObject returns a new CordonHelper, or an error if given object is not a
-// node or cannot be encoded as JSON
-func NewCordonHelperFromRuntimeObject(nodeObject runtime.Object, scheme *runtime.Scheme, gvk schema.GroupVersionKind) (*CordonHelper, error) {
-	nodeObject, err := scheme.ConvertToVersion(nodeObject, gvk.GroupVersion())
-	if err != nil {
-		return nil, err
-	}
-
-	node, ok := nodeObject.(*corev1.Node)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", nodeObject)
-	}
-
-	return NewCordonHelper(node), nil
 }
 
 // UpdateIfRequired returns true if c.node.Spec.Unschedulable isn't already set,
