@@ -51,17 +51,43 @@ type Client struct {
 	logger.Logger
 	GetKubeConfigBytes   func() ([]byte, error)
 	GetRESTConfig        func() (*rest.Config, error)
+	GetKustomizePatches  func() ([]string, error)
 	ApplyDryRun          bool
 	ApplyHook            ApplyHook
 	ImmutableAnnotations []string
 	Trace                bool
-	GetKustomizePatches  func() ([]string, error)
-	client               *kubernetes.Clientset
-	dynamicClient        dynamic.Interface
-	restConfig           *rest.Config
-	etcdClientGenerator  *etcd.EtcdClientGenerator
-	kustomizeManager     *kustomize.Manager
-	restMapper           meta.RESTMapper
+
+	client              *kubernetes.Clientset
+	dynamicClient       dynamic.Interface
+	restConfig          *rest.Config
+	etcdClientGenerator *etcd.EtcdClientGenerator
+	kustomizeManager    *kustomize.Manager
+	restMapper          meta.RESTMapper
+}
+
+func NewClientFromDefaults(log logger.Logger) (*Client, error) {
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		kubeconfig = os.ExpandEnv("$HOME/.kube/config")
+	}
+
+	if !files.Exists(kubeconfig) {
+		if config, err := rest.InClusterConfig(); err == nil {
+			return NewClient(config, log), nil
+		} else {
+			return nil, fmt.Errorf("cannot find kubeconfig")
+		}
+	}
+
+	data, err := ioutil.ReadFile(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(restConfig, log), nil
 }
 
 func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
@@ -124,9 +150,6 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 		patchData, err = templatizePatch(patchData)
 		if err != nil {
 			return nil, perrors.WithMessagef(err, "syntax error when reading %s ", name)
-		}
-		if c.Trace {
-			c.Tracef("patch file %v after templating:\n%v\n\n", name, string(*patchData))
 		}
 		if _, err := files.CopyFromReader(bytes.NewBuffer(*patchData), dir+"/"+name, 0644); err != nil {
 			return nil, err
