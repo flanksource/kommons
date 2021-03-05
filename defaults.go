@@ -43,9 +43,6 @@ func DefaultsService(svc *v1.Service) *v1.Service {
 		if port.Protocol == "" {
 			port.Protocol = v1.ProtocolTCP
 		}
-		if port.TargetPort.String() == "" {
-			port.TargetPort = *intStrPtr(port.Port)
-		}
 		_ports = append(_ports, port)
 	}
 	svc.Spec.Ports = _ports
@@ -170,9 +167,6 @@ func DefaultsContainer(container v1.Container) v1.Container {
 		if port.Protocol == "" {
 			port.Protocol = corev1.ProtocolTCP
 		}
-		if port.ContainerPort > 0 && port.HostPort == 0 {
-			port.HostPort = port.ContainerPort
-		}
 		_ports = append(_ports, port)
 	}
 	_env := []v1.EnvVar{}
@@ -229,7 +223,6 @@ func DefaultsPod(pod v1.PodTemplateSpec) v1.PodTemplateSpec {
 
 func DefaultsDaemonSet(daemeonset *appsv1.DaemonSet) *appsv1.DaemonSet {
 	defaulter.Default(daemeonset)
-	// deploy.Spec.ProgressDeadlineSeconds = defaultInt(deploy.Spec.ProgressDeadlineSeconds, 600)
 	daemeonset.Spec.RevisionHistoryLimit = defaultInt(daemeonset.Spec.RevisionHistoryLimit, 10)
 	if daemeonset.Spec.UpdateStrategy.Type == "" {
 		daemeonset.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{
@@ -241,6 +234,13 @@ func DefaultsDaemonSet(daemeonset *appsv1.DaemonSet) *appsv1.DaemonSet {
 	}
 	daemeonset.Spec.Template = DefaultsPod(daemeonset.Spec.Template)
 	return daemeonset
+}
+
+func DefaultsStatefulSet(sts *appsv1.StatefulSet) *appsv1.StatefulSet {
+	defaulter.Default(sts)
+	sts.Spec.RevisionHistoryLimit = defaultInt(sts.Spec.RevisionHistoryLimit, 10)
+	sts.Spec.Template = DefaultsPod(sts.Spec.Template)
+	return sts
 }
 
 func DefaultsDeployment(deploy *appsv1.Deployment) *appsv1.Deployment {
@@ -296,6 +296,9 @@ func ToUnstructured(unstructuredObj *unstructured.Unstructured, obj interface{})
 }
 
 func Defaults(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if obj == nil {
+		return nil, nil
+	}
 	if _, found, _ := unstructured.NestedString(obj.Object, "metadata", "creationTimestamp"); !found {
 		unstructured.SetNestedField(obj.Object, "metadata", "creationTimestamp", "nil")
 	}
@@ -311,19 +314,12 @@ func Defaults(obj *unstructured.Unstructured) (*unstructured.Unstructured, error
 			return nil, err
 		}
 		return ToUnstructured(obj, DefaultsDaemonSet(daemonset))
-
-		// } else if IsCustomResourceDefinitionV1Beta1(obj) {
-		// 	crd, err := AsCustomResourceDefinitionV1Beta1(obj)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return ToUnstructured(obj, DefaultsCustomResourceDefinitionV1Beta1(crd))
-	} else if IsCustomResourceDefinition(obj) && obj.GetAPIVersion() == "v1" {
-		crd, err := AsCustomResourceDefinition(obj)
+	} else if IsStatefulSet(obj) {
+		sts, err := AsStatefulSet(obj)
 		if err != nil {
 			return nil, err
 		}
-		return ToUnstructured(obj, DefaultsCustomResourceDefinition(crd))
+		return ToUnstructured(obj, DefaultsStatefulSet(sts))
 	} else if IsService(obj) {
 		svc, err := AsService(obj)
 		if err != nil {
