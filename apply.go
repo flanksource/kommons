@@ -20,6 +20,7 @@ var (
 	created    = fmt.Sprintf("(%s)", console.Greenf("created"))
 	deleted    = fmt.Sprintf("(%s)", console.Redf("deleted"))
 	configured = fmt.Sprintf("(%s)", console.Magentaf("configured"))
+	kustomized = fmt.Sprintf("+%s", console.Yellowf("kustomized"))
 	diff       = diffmatchpatch.New()
 )
 
@@ -63,7 +64,6 @@ func (c *Client) copyImmutable(from, to *unstructured.Unstructured) {
 	to.SetUID(from.GetUID())
 	to.SetCreationTimestamp(from.GetCreationTimestamp())
 	to.SetGeneration(from.GetGeneration())
-
 }
 
 // Sanitize will remove "runtime" fields from objects that woulds otherwise increase the verbosity of diffs
@@ -216,12 +216,16 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			continue
 		}
 
+		extra := ""
+		if IsKustomized(unstructuredObj) {
+			extra = " " + kustomized
+		}
 		existing, _ := client.Get(context.TODO(), unstructuredObj.GetName(), metav1.GetOptions{})
 		c.copyImmutable(existing, unstructuredObj)
 		if existing == nil {
 			if c.Trace {
 				if IsCustomResourceDefinition(unstructuredObj) {
-					c.Tracef("%s creating", GetName(unstructuredObj))
+					c.Tracef("%s creating %s", GetName(unstructuredObj), extra)
 				} else {
 					c.Tracef(ToYaml(unstructuredObj))
 				}
@@ -230,10 +234,10 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			if err != nil {
 				return perrors.Wrap(err, GetName(unstructuredObj))
 			} else {
-				c.Infof("%s %s", GetName(unstructuredObj), created)
+				c.Infof("%s %s%s", GetName(unstructuredObj), created, extra)
 			}
 		} else if !c.HasChanges(existing, unstructuredObj) {
-			c.Debugf("%s %s", GetName(unstructuredObj), skipping)
+			c.Debugf("%s %s%s", GetName(unstructuredObj), skipping, extra)
 		} else {
 			newObject := unstructuredObj.DeepCopy()
 			updated, err := client.Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
@@ -251,9 +255,9 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			}
 
 			if updated.GetResourceVersion() == unstructuredObj.GetResourceVersion() {
-				c.Debugf("%s %s", GetName(unstructuredObj), unchanged)
+				c.Debugf("%s %s%s", GetName(unstructuredObj), unchanged, extra)
 			} else {
-				c.Infof("%s %s", GetName(unstructuredObj), configured)
+				c.Infof("%s %s%s", GetName(unstructuredObj), configured, extra)
 				if c.Trace {
 					c.Tracef(Diff(unstructuredObj, existing))
 				}
@@ -264,7 +268,6 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 }
 
 func (c *Client) DeleteByKind(kind, namespace, name string) error {
-	c.Debugf("Deleting %s/%s/%s", kind, namespace, name)
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
 		return err

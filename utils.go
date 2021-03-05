@@ -17,30 +17,73 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
+	"reflect"
 	"sigs.k8s.io/yaml"
 	"strings"
 	"time"
 )
 
+var KustomizedLabel = "kustomize/patched"
+
+func IsKustomized(to *unstructured.Unstructured) bool {
+	if _, ok := to.GetAnnotations()[KustomizedLabel]; ok {
+		return true
+	}
+	return false
+}
+
 func ToJson(to *unstructured.Unstructured) string {
+	if IsNil(to) {
+		return ""
+	}
 	data, _ := to.MarshalJSON()
 	return string(data)
 }
 
 func ToYaml(to *unstructured.Unstructured) string {
+	if IsNil(to) {
+		return ""
+	}
 	data, _ := yaml.Marshal(to)
 	return string(data)
 }
 
 func AsDeployment(obj *unstructured.Unstructured) (*appsv1.Deployment, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var deployment appsv1.Deployment
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return nil, err
 	}
 	return &deployment, nil
 }
+func AsStatefulSet(obj *unstructured.Unstructured) (*appsv1.StatefulSet, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
+	var sts appsv1.StatefulSet
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &sts); err != nil {
+		return nil, err
+	}
+	return &sts, nil
+}
+
+func AsSecret(obj *unstructured.Unstructured) (*v1.Secret, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
+	var secret v1.Secret
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &secret); err != nil {
+		return nil, err
+	}
+	return &secret, nil
+}
 
 func AsService(obj *unstructured.Unstructured) (*v1.Service, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var svc v1.Service
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &svc); err != nil {
 		return nil, err
@@ -49,6 +92,9 @@ func AsService(obj *unstructured.Unstructured) (*v1.Service, error) {
 }
 
 func AsIngress(obj *unstructured.Unstructured) (*networking.Ingress, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var ing networking.Ingress
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &ing); err != nil {
 		return nil, err
@@ -57,6 +103,9 @@ func AsIngress(obj *unstructured.Unstructured) (*networking.Ingress, error) {
 }
 
 func AsRoleBinding(obj *unstructured.Unstructured) (*rbac.RoleBinding, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var rb rbac.RoleBinding
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &rb); err != nil {
 		return nil, err
@@ -65,6 +114,9 @@ func AsRoleBinding(obj *unstructured.Unstructured) (*rbac.RoleBinding, error) {
 }
 
 func AsClusterRoleBinding(obj *unstructured.Unstructured) (*rbac.ClusterRoleBinding, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var crb rbac.ClusterRoleBinding
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crb); err != nil {
 		return nil, err
@@ -73,6 +125,9 @@ func AsClusterRoleBinding(obj *unstructured.Unstructured) (*rbac.ClusterRoleBind
 }
 
 func AsDaemonSet(obj *unstructured.Unstructured) (*appsv1.DaemonSet, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var daemonset appsv1.DaemonSet
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &daemonset); err != nil {
 		return nil, err
@@ -81,6 +136,9 @@ func AsDaemonSet(obj *unstructured.Unstructured) (*appsv1.DaemonSet, error) {
 }
 
 func AsCustomResourceDefinition(obj *unstructured.Unstructured) (*apiextensions.CustomResourceDefinition, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var crd apiextensions.CustomResourceDefinition
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crd); err != nil {
 		return nil, err
@@ -89,6 +147,9 @@ func AsCustomResourceDefinition(obj *unstructured.Unstructured) (*apiextensions.
 }
 
 func AsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var crd apiextensionsv1beta1.CustomResourceDefinition
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &crd); err != nil {
 		return nil, err
@@ -97,6 +158,9 @@ func AsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) (*apiexte
 }
 
 func AsPodTemplate(obj *unstructured.Unstructured) (*v1.PodTemplateSpec, error) {
+	if IsNil(obj) {
+		return nil, nil
+	}
 	var spec v1.PodTemplateSpec
 	template, _, err := unstructured.NestedMap(obj.Object, "spec", "template")
 	if err != nil {
@@ -112,22 +176,45 @@ func GetValidName(name string) string {
 	return strings.ReplaceAll(name, "_", "-")
 }
 
-func GetName(obj *unstructured.Unstructured) string {
-	return fmt.Sprintf("%s/%s/%s", console.Bluef(obj.GetKind()), console.Grayf(obj.GetNamespace()), console.LightWhitef(obj.GetName()))
-}
-
-func IsNil(object runtime.Object) bool {
-	if object == nil {
-		return true
-	}
-	switch object.(type) {
-	case *unstructured.Unstructured:
-		obj := object.(*unstructured.Unstructured)
-		if obj == nil {
-			return true
+func GetName(obj Nameable) string {
+	kind := ""
+	switch obj.(type) {
+	case Kindable:
+		kind = obj.(Kindable).GetKind()
+	default:
+		if t := reflect.TypeOf(obj); t.Kind() == reflect.Ptr {
+			kind = t.Elem().Name()
+		} else {
+			kind = t.Name()
 		}
 	}
-	return false
+	return fmt.Sprintf("%s/%s/%s", console.Bluef(kind), console.Grayf(obj.GetNamespace()), console.LightWhitef(obj.GetName()))
+}
+
+type Name struct {
+	Name, Kind, Namespace string
+}
+
+func (n Name) String() string {
+	return GetName(n)
+}
+func (n Name) GetName() string {
+	return n.Name
+}
+func (n Name) GetKind() string {
+	return n.Kind
+}
+func (n Name) GetNamespace() string {
+	return n.Namespace
+}
+
+type Kindable interface {
+	GetKind() string
+}
+
+type Nameable interface {
+	GetName() string
+	GetNamespace() string
 }
 
 func Validate(object runtime.Object) error {
@@ -146,6 +233,20 @@ func Validate(object runtime.Object) error {
 
 	}
 	return nil
+}
+
+func IsNil(object runtime.Object) bool {
+	if object == nil {
+		return true
+	}
+	switch object.(type) {
+	case *unstructured.Unstructured:
+		obj := object.(*unstructured.Unstructured)
+		if obj == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func IsSecret(obj *unstructured.Unstructured) bool {
@@ -175,6 +276,10 @@ func IsDaemonSet(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "DaemonSet"
 }
 
+func IsStatefulSet(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "StatefulSet"
+}
+
 func IsAnyRoleBinding(obj *unstructured.Unstructured) bool {
 	return IsRoleBinding(obj) || IsClusterRoleBinding(obj)
 }
@@ -190,9 +295,11 @@ func IsClusterRoleBinding(obj *unstructured.Unstructured) bool {
 func IsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "CustomResourceDefinition" && obj.GetAPIVersion() == "apiextensions.k8s.io/v1beta1"
 }
+
 func IsCustomResourceDefinition(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "CustomResourceDefinition"
 }
+
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)

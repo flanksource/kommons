@@ -73,7 +73,6 @@ func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
 		},
 	}
 	client.GetRESTConfig = client.GetRESTConfigFromKubeconfig
-
 	return client, nil
 }
 

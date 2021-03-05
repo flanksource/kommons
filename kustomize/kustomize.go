@@ -177,8 +177,16 @@ func (km *Manager) KustomizeRaw(namespace string, data []byte) ([]runtime.Object
 	if err != nil {
 		return nil, err
 	}
-
 	return km.Kustomize(namespace, raw...)
+}
+
+func setAnnotation(obj *unstructured.Unstructured, key string, value string) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[key] = value
+	obj.SetAnnotations(annotations)
 }
 
 // Kustomize apply a set of patches to a resource.
@@ -203,7 +211,8 @@ func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]run
 			kustomized = append(kustomized, resource)
 			continue
 		}
-		log.Infof("[kustomize] Applying %d patches to %s Resource=%s/%s", patchesCnt, resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
+
+		setAnnotation(resource, "kustomize/patched", "true")
 
 		// create an in memory fs to use for the kustomization
 		memFS := fs.MakeFakeFS()

@@ -6,90 +6,114 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
-	client, err := c.GetClientset()
-	if err != nil {
-		return err
-	}
-	pods := client.CoreV1().Pods(ns)
 	start := time.Now()
+	msg := true
 	for {
-		ready := 0
-		pending := 0
-		list, _ := pods.List(context.TODO(), metav1.ListOptions{})
-		for _, pod := range list.Items {
-			conditions := true
-			for _, condition := range pod.Status.Conditions {
-				if condition.Status == v1.ConditionFalse {
-					conditions = false
-				}
-			}
-			if conditions && (pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded) {
-				ready++
-			} else {
-				pending++
-			}
+		ready, message := c.IsNamespaceReady(ns)
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf(message)
 		}
-		if ready > 0 && pending == 0 {
+		if ready {
 			return nil
 		}
-		c.Debugf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
-		if start.Add(timeout).Before(time.Now()) {
-			return fmt.Errorf("ns/%s: ready=%d, pending=%d", ns, ready, pending)
+		if !msg {
+			c.Infof(message)
+			msg = true
 		}
 		time.Sleep(2 * time.Second)
 	}
 	return nil
 }
 
-func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) error {
-	client, err := c.GetClientByKind(kind)
+func (c *Client) IsNamespaceReady(ns string) (bool, string) {
+	client, err := c.GetClientset()
 	if err != nil {
-		return err
+		return false, err.Error()
 	}
-	start := time.Now()
-	var msg bool
-	for {
-		item, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	pods := client.CoreV1().Pods(ns)
 
-		if errors.IsNotFound(err) {
-			return err
-		}
-
-		if start.Add(timeout).Before(time.Now()) {
-			return fmt.Errorf("timeout exceeded waiting for %s/%s is %s, error: %v", kind, name, "", err)
-		}
-
-		if !msg {
-			c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
-			msg = true
-		}
-
-		if err != nil {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		if item.Object["status"] == nil {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		conditions := item.Object["status"].(map[string]interface{})["conditions"].([]interface{})
-
-		for _, raw := range conditions {
-			condition := raw.(map[string]interface{})
-			c.Debugf("%s/%s is %s/%s: %s", namespace, name, condition["type"], condition["status"], condition["message"])
-			if condition["type"] == "Ready" && condition["status"] == "True" {
-				return nil
+	ready := 0
+	pending := 0
+	list, _ := pods.List(context.TODO(), metav1.ListOptions{})
+	for _, pod := range list.Items {
+		conditions := true
+		for _, condition := range pod.Status.Conditions {
+			if condition.Status == v1.ConditionFalse {
+				conditions = false
 			}
 		}
-		c.Infof("Waiting for %s/%s/%s", kind, namespace, name)
+		if conditions && (pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded) {
+			ready++
+		} else {
+			pending++
+		}
+	}
+	if ready > 0 && pending == 0 {
+		return true, ""
+	}
+	return false, fmt.Sprintf("%s ⏳ waiting for ready=%d, pending=%d", Name{Kind: "Namespace", Name: ns}, ready, pending)
+}
+
+func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) (*unstructured.Unstructured, error) {
+	client, err := c.GetClientByKind(kind)
+	if err != nil {
+		return nil, err
+	}
+	start := time.Now()
+	var msg string
+	id := Name{Kind: kind, Namespace: namespace, Name: name}
+	for {
+		item, _ := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+		if start.Add(timeout).Before(time.Now()) {
+			return nil, fmt.Errorf("timeout exceeded waiting for %s/%s is %s, error: %v", kind, name, "", err)
+		}
+		ready, message := c.IsReady(item)
+		if ready {
+			return item, nil
+		}
+
+		if !ready && message != msg {
+			c.Infof("%s %s", id, message)
+			msg = message
+		}
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
+	if item == nil {
+		return false, "⏳ waiting to be created"
+	}
+
+	if IsSecret(item) {
+		data, found, _ := unstructured.NestedMap(item.Object, "data")
+		if found && len(data) > 0 {
+			return true, ""
+		} else {
+			return false, "⏳ waiting for data"
+		}
+	}
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	conditions := item.Object["status"].(map[string]interface{})["conditions"].([]interface{})
+	if len(conditions) == 0 {
+		return false, "⏳ waiting to become ready"
+	}
+	for _, raw := range conditions {
+		condition := raw.(map[string]interface{})
+		if condition["type"] != "Ready" && condition["status"] != "True" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+		}
+	}
+	return true, ""
 }
 
 // WaitForPod waits for a pod to be in the specified phase, or returns an
@@ -143,7 +167,7 @@ func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error
 		}
 
 		if !msg {
-			c.Infof("Waiting for %s/%s to have 1 ready replica", ns, name)
+			c.Infof("%s ⏳ waiting for at least 1 pod", GetName(deployment))
 			msg = true
 		}
 
@@ -171,7 +195,35 @@ func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) erro
 		}
 
 		if !msg {
-			c.Infof("Waiting for %s/%s to have 1 ready replica", ns, name)
+			c.Infof("%s waiting for at least 1 pod", GetName(statefulset))
+			msg = true
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// WaitForDaemonSet waits for a statefulset to have at least 1 ready replica, or returns an
+// error if the timeout is exceeded
+func (c *Client) WaitForDaemonSet(ns, name string, timeout time.Duration) error {
+	client, err := c.GetClientset()
+	if err != nil {
+		return err
+	}
+	daemonsets := client.AppsV1().DaemonSets(ns)
+	start := time.Now()
+	msg := false
+	for {
+		daemonset, _ := daemonsets.Get(context.TODO(), name, metav1.GetOptions{})
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("timeout exceeded waiting for daemonset to become ready %s", name)
+		}
+		if daemonset != nil && daemonset.Status.NumberReady >= 1 {
+			return nil
+		}
+
+		if !msg {
+			c.Infof("%s waiting for at least 1 pod", GetName(daemonset))
 			msg = true
 		}
 
