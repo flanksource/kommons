@@ -128,6 +128,10 @@ func RequiresReplacement(obj *unstructured.Unstructured, err error) bool {
 	return false
 }
 
+func IsDiffable(obj *unstructured.Unstructured) bool {
+	return !IsSecret(obj) && !IsCustomResourceDefinition(obj)
+}
+
 func Diff(from, to *unstructured.Unstructured) string {
 	_from := from.DeepCopy()
 	_to := to.DeepCopy()
@@ -148,11 +152,8 @@ func Diff(from, to *unstructured.Unstructured) string {
 }
 
 func (c *Client) HasChanges(from, to *unstructured.Unstructured) bool {
-	// if IsCustomResourceDefinition(from) || IsCustomResourceDefinitionV1Beta1(from) {
-	// 	return true
-	// }
 	if diff := Diff(from, to); diff != "" {
-		if c.Trace {
+		if c.Trace && IsDiffable(from) { // skip CRD diffing as they are too verbose
 			c.Tracef(diff)
 		}
 		return true
@@ -271,7 +272,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				c.Debugf("%s %s%s", GetName(unstructuredObj), unchanged, extra)
 			} else {
 				c.Infof("%s %s%s", GetName(unstructuredObj), configured, extra)
-				if c.Trace {
+				if c.Trace && IsDiffable(unstructuredObj) {
 					c.Tracef(Diff(unstructuredObj, existing))
 				}
 			}
