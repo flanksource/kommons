@@ -89,6 +89,15 @@ func Sanitize(objects ...*unstructured.Unstructured) {
 	}
 }
 
+func StripIdentifiers(object *unstructured.Unstructured) *unstructured.Unstructured {
+	object.SetResourceVersion("")
+	object.SetSelfLink("")
+	object.SetUID("")
+	object.SetCreationTimestamp(metav1.Time{})
+	object.SetGeneration(0)
+	return object
+}
+
 func (c *Client) DeleteUnstructured(namespace string, objects ...*unstructured.Unstructured) error {
 	for _, unstructuredObj := range objects {
 		client, err := c.GetRestClient(*unstructuredObj)
@@ -252,7 +261,8 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				if err := client.Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{}); err != nil {
 					return perrors.Wrapf(err, "failed to delete %s, during replacement", GetName(unstructuredObj))
 				}
-				if updated, err = client.Create(context.TODO(), newObject, metav1.CreateOptions{}); err != nil {
+
+				if updated, err = client.Create(context.TODO(), StripIdentifiers(newObject), metav1.CreateOptions{}); err != nil {
 					return perrors.Wrapf(err, "failed to recreate %s, during replacement, neither the new or old object remain", GetName(unstructuredObj))
 				}
 			}
