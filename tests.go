@@ -23,7 +23,7 @@ func TestDeploy(client kubernetes.Interface, ns string, deploymentName string, t
 
 	deployment, err := client.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		t.Skipf(deploymentName, "deployment not found")
+		t.Failf(deploymentName, "deployment not found")
 		return
 	}
 	labelMap, _ := metav1.LabelSelectorAsMap(deployment.Spec.Selector)
@@ -129,7 +129,7 @@ func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResult
 	if len(list.Items) == 0 {
 		_, err := client.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			t.Skipf(ns, "[%s] namespace not found, skipping", ns)
+			t.Failf(ns, "[%s] namespace not found, skipping", ns)
 		} else {
 			t.Failf(ns, "[%s] Expected pods but none running - did you deploy?", ns)
 		}

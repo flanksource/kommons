@@ -183,6 +183,9 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			continue
 		}
 		client, _, unstructuredObj, err := c.GetDynamicClientFor(namespace, obj)
+		if err != nil {
+			return err
+		}
 		// apply defaults to objects beforehand to prevent uncessary configured logs
 		if unstructuredObj, err = Defaults(unstructuredObj); err != nil {
 			return err
@@ -202,7 +205,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 				return err
 			}
 			if len(kustomized) != 1 {
-				return fmt.Errorf("expecting 1 kustomized object back, got %d", len(kustomized))
+				return fmt.Errorf("failed to kustomize %s, got %d objects back", GetName(unstructuredObj), len(kustomized))
 			}
 			unstructuredObj = kustomized[0].(*unstructured.Unstructured)
 		}
@@ -232,7 +235,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			}
 			_, err = client.Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
 			if err != nil {
-				return perrors.Wrap(err, GetName(unstructuredObj))
+				return perrors.Wrapf(err, "%s", GetName(unstructuredObj))
 			} else {
 				c.Infof("%s %s%s", GetName(unstructuredObj), created, extra)
 			}

@@ -8,6 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
@@ -57,6 +58,11 @@ func (c *Client) IsNamespaceReady(ns string) (bool, string) {
 		return true, ""
 	}
 	return false, fmt.Sprintf("%s ⏳ waiting for ready=%d, pending=%d", Name{Kind: "Namespace", Name: ns}, ready, pending)
+}
+
+func (c *Client) WaitFor(obj runtime.Object, timeout time.Duration) (*unstructured.Unstructured, error) {
+	id := GetName(obj)
+	return c.WaitForResource(id.Kind, id.Namespace, id.Name, timeout)
 }
 
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) (*unstructured.Unstructured, error) {
@@ -195,7 +201,7 @@ func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) erro
 		}
 
 		if !msg {
-			c.Infof("%s waiting for at least 1 pod", GetName(statefulset))
+			c.Infof("%s ⏳ waiting for at least 1 pod", GetName(statefulset))
 			msg = true
 		}
 
@@ -211,19 +217,24 @@ func (c *Client) WaitForDaemonSet(ns, name string, timeout time.Duration) error 
 		return err
 	}
 	daemonsets := client.AppsV1().DaemonSets(ns)
+	id := Name{Kind: "Daemonset", Name: name, Namespace: ns}
 	start := time.Now()
 	msg := false
 	for {
-		daemonset, _ := daemonsets.Get(context.TODO(), name, metav1.GetOptions{})
-		if start.Add(timeout).Before(time.Now()) {
-			return fmt.Errorf("timeout exceeded waiting for daemonset to become ready %s", name)
+		daemonset, err := daemonsets.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("%s timeout waiting for daemonset to become ready", id)
+		}
+
 		if daemonset != nil && daemonset.Status.NumberReady >= 1 {
 			return nil
 		}
 
 		if !msg {
-			c.Infof("%s waiting for at least 1 pod", GetName(daemonset))
+			c.Infof("%s ⏳ waiting for at least 1 pod", id)
 			msg = true
 		}
 

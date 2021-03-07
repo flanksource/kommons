@@ -58,6 +58,7 @@ func AsDeployment(obj *unstructured.Unstructured) (*appsv1.Deployment, error) {
 	}
 	return &deployment, nil
 }
+
 func AsStatefulSet(obj *unstructured.Unstructured) (*appsv1.StatefulSet, error) {
 	if IsNil(obj) {
 		return nil, nil
@@ -176,19 +177,38 @@ func GetValidName(name string) string {
 	return strings.ReplaceAll(name, "_", "-")
 }
 
-func GetName(obj Nameable) string {
-	kind := ""
+func GetName(obj interface{}) Name {
+	name := Name{}
 	switch obj.(type) {
-	case Kindable:
-		kind = obj.(Kindable).GetKind()
+	case *unstructured.Unstructured:
+		object := obj.(*unstructured.Unstructured)
+		if object == nil || object.Object == nil {
+			return name
+		}
+		name.Name = object.GetName()
+		name.Namespace = object.GetNamespace()
+	case metav1.ObjectMetaAccessor:
+		object := obj.(metav1.ObjectMetaAccessor).GetObjectMeta()
+		name.Name = object.GetName()
+		name.Namespace = object.GetNamespace()
+	}
+
+	switch obj.(type) {
+	case *unstructured.Unstructured:
+		object := obj.(*unstructured.Unstructured)
+		if object == nil || object.Object == nil {
+			return name
+		}
+		name.Kind = object.GetKind()
 	default:
 		if t := reflect.TypeOf(obj); t.Kind() == reflect.Ptr {
-			kind = t.Elem().Name()
+			name.Kind = t.Elem().Name()
 		} else {
-			kind = t.Name()
+			name.Kind = t.Name()
 		}
 	}
-	return fmt.Sprintf("%s/%s/%s", console.Bluef(kind), console.Grayf(obj.GetNamespace()), console.LightWhitef(obj.GetName()))
+
+	return name
 }
 
 type Name struct {
@@ -196,14 +216,19 @@ type Name struct {
 }
 
 func (n Name) String() string {
-	return GetName(n)
+	if n.Namespace == "" {
+		return fmt.Sprintf("%s/%s/%s", console.Bluef(n.Kind), console.Grayf("*"), console.LightWhitef(n.Name))
+	}
+	return fmt.Sprintf("%s/%s/%s", console.Bluef(n.Kind), console.Grayf(n.Namespace), console.LightWhitef(n.Name))
 }
+
 func (n Name) GetName() string {
 	return n.Name
 }
 func (n Name) GetKind() string {
 	return n.Kind
 }
+
 func (n Name) GetNamespace() string {
 	return n.Namespace
 }

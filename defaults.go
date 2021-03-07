@@ -150,6 +150,7 @@ func DefaultsCustomResourceDefinitionV1Beta1(crd *apiextensionsv1beta1.CustomRes
 	}
 	return crd
 }
+
 func DefaultsContainers(containers []v1.Container) []v1.Container {
 	_containers := []v1.Container{}
 	for _, container := range containers {
@@ -157,6 +158,7 @@ func DefaultsContainers(containers []v1.Container) []v1.Container {
 	}
 	return _containers
 }
+
 func DefaultsContainer(container v1.Container) v1.Container {
 	if container.TerminationMessagePolicy == "" {
 		container.TerminationMessagePolicy = corev1.TerminationMessageReadFile
@@ -185,6 +187,7 @@ func DefaultsContainer(container v1.Container) v1.Container {
 	container.ReadinessProbe = DefaultsProbe(container.ReadinessProbe)
 	return container
 }
+
 func DefaultsPod(pod v1.PodTemplateSpec) v1.PodTemplateSpec {
 	pod.Spec.Containers = DefaultsContainers(pod.Spec.Containers)
 	pod.Spec.InitContainers = DefaultsContainers(pod.Spec.InitContainers)
@@ -203,8 +206,11 @@ func DefaultsPod(pod v1.PodTemplateSpec) v1.PodTemplateSpec {
 
 	pod.Spec.TerminationGracePeriodSeconds = defaultInt64(pod.Spec.TerminationGracePeriodSeconds, 30)
 
-	if pod.Spec.ServiceAccountName != pod.Spec.DeprecatedServiceAccount {
+	if pod.Spec.ServiceAccountName != "" && pod.Spec.ServiceAccountName != pod.Spec.DeprecatedServiceAccount {
 		pod.Spec.DeprecatedServiceAccount = pod.Spec.ServiceAccountName
+	}
+	if pod.Spec.DeprecatedServiceAccount != "" && pod.Spec.ServiceAccountName != pod.Spec.DeprecatedServiceAccount {
+		pod.Spec.ServiceAccountName = pod.Spec.DeprecatedServiceAccount
 	}
 	if pod.Spec.DNSPolicy == "" {
 		pod.Spec.DNSPolicy = v1.DNSClusterFirst
@@ -239,6 +245,17 @@ func DefaultsDaemonSet(daemeonset *appsv1.DaemonSet) *appsv1.DaemonSet {
 func DefaultsStatefulSet(sts *appsv1.StatefulSet) *appsv1.StatefulSet {
 	defaulter.Default(sts)
 	sts.Spec.RevisionHistoryLimit = defaultInt(sts.Spec.RevisionHistoryLimit, 10)
+	if sts.Spec.PodManagementPolicy == "" {
+		sts.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	}
+	if sts.Spec.UpdateStrategy.Type == "" {
+		sts.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				Partition: intPtr(0),
+			},
+		}
+	}
 	sts.Spec.Template = DefaultsPod(sts.Spec.Template)
 	return sts
 }
