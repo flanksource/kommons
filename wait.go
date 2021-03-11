@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type WaitFN func(*unstructured.Unstructured) (bool, string)
+
 func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
 	start := time.Now()
 	msg := true
@@ -66,6 +68,14 @@ func (c *Client) WaitFor(obj runtime.Object, timeout time.Duration) (*unstructur
 }
 
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) (*unstructured.Unstructured, error) {
+	return c.waitForResource(kind, namespace, name, timeout, c.IsReady)
+}
+
+func (c *Client) WaitForCRD(kind, namespace, name string, timeout time.Duration, waitFN WaitFN) (*unstructured.Unstructured, error) {
+	return c.waitForResource(kind, namespace, name, timeout, waitFN)
+}
+
+func (c *Client) waitForResource(kind, namespace, name string, timeout time.Duration, waitFN WaitFN) (*unstructured.Unstructured, error) {
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
 		return nil, err
@@ -79,7 +89,7 @@ func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Dura
 		if start.Add(timeout).Before(time.Now()) {
 			return nil, fmt.Errorf("timeout exceeded waiting for %s/%s is %s, error: %v", kind, name, "", err)
 		}
-		ready, message := c.IsReady(item)
+		ready, message := waitFN(item)
 		if ready {
 			return item, nil
 		}
@@ -109,7 +119,21 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return false, "⏳ waiting to become ready"
 	}
 
-	conditions := item.Object["status"].(map[string]interface{})["conditions"].([]interface{})
+	status := item.Object["status"].(map[string]interface{})
+
+	if IsStatefulSet(item) || IsDeployment(item) {
+		if status["replicas"] != "" && status["replicas"] == status["readyReplicas"] {
+			return true, ""
+		} else {
+			return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", status["readyReplicas"], status["replicas"])
+		}
+	}
+
+	if _, found := status["conditions"]; !found {
+		return false, "object does not expose conditions"
+	}
+
+	conditions := status["conditions"].([]interface{})
 	if len(conditions) == 0 {
 		return false, "⏳ waiting to become ready"
 	}
