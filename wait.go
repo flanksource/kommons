@@ -74,7 +74,6 @@ func (c *Client) WaitFor(obj runtime.Object, timeout time.Duration) (*unstructur
 }
 
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) (*unstructured.Unstructured, error) {
-<<<<<<< HEAD
 	return c.waitForResource(kind, namespace, name, timeout, c.IsReady)
 }
 
@@ -83,11 +82,9 @@ func (c *Client) WaitForCRD(kind, namespace, name string, timeout time.Duration,
 }
 
 func (c *Client) waitForResource(kind, namespace, name string, timeout time.Duration, waitFN WaitFN) (*unstructured.Unstructured, error) {
-=======
 	if c.ApplyDryRun {
 		return nil, nil
 	}
->>>>>>> 8767951... fix: waits should be dry-run aware
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
 		return nil, err
