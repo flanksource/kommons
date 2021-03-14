@@ -481,11 +481,11 @@ type WebhookConfigBuilder struct {
 }
 
 func (b WebhookConfigBuilder) Build() *admission.ValidatingWebhookConfiguration {
-	b.ValidatingWebhookConfiguration.ObjectMeta.Namespace = ""
 	b.ValidatingWebhookConfiguration.TypeMeta = metav1.TypeMeta{
 		Kind:       "ValidatingWebhookConfiguration",
 		APIVersion: "admissionregistration.k8s.io/v1",
 	}
+	b.ValidatingWebhookConfiguration.ObjectMeta.Namespace = ""
 	return &b.ValidatingWebhookConfiguration
 
 }
