@@ -325,6 +325,10 @@ func IsCustomResourceDefinition(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "CustomResourceDefinition"
 }
 
+func IsConstraintTemplate(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "ConstraintTemplate"
+}
+
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)

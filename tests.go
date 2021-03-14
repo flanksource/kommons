@@ -113,6 +113,10 @@ func TestPod(testName string, client kubernetes.Interface, events typedv1.EventI
 	// check all pod liveness / readiness
 }
 
+func GetOwner(pod v1.Pod) string {
+	return pod.GetName()
+}
+
 func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResults) {
 	if client == nil {
 		t.Failf(ns, "failed to get kubernetes client")
@@ -131,24 +135,20 @@ func TestNamespace(client kubernetes.Interface, ns string, t *console.TestResult
 		if errors.IsNotFound(err) {
 			t.Failf(ns, "[%s] namespace not found, skipping", ns)
 		} else {
-			t.Failf(ns, "[%s] Expected pods but none running - did you deploy?", ns)
+			t.Failf(ns, "[%s] Expected pods but none running", ns)
 		}
 		return
 	}
-	fails := make([]error, 0)
+	failed := 0
 	for _, pod := range list.Items {
-		err = TestPod(ns, client, events, pod)
-		if err != nil {
-			fails = append(fails, err)
+		if err := TestPod(ns, client, events, pod); err != nil {
+			t.Failf(ns, "%s %s", GetOwner(pod), err)
+			failed++
 		}
 	}
-	if len(fails) > 0 {
-		message := fmt.Sprintf("[%s] %d of %d pods failed: ", ns, len(fails), len(list.Items))
-		for _, err := range fails {
-			message += err.Error() + ". "
-		}
-		message = strings.TrimSuffix(message, " ")
-		t.Failf(ns, message)
+	if failed > 0 {
+		t.Failf(ns, "[%s] %d of %d pods failed: ", ns, failed, len(list.Items))
+	} else {
+		t.Passf(ns, "[%s] %d of %d pods passed", ns, len(list.Items), len(list.Items))
 	}
-	t.Passf(ns, "[%s] %d of %d pods passed", ns, len(list.Items), len(list.Items))
 }
