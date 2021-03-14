@@ -14,6 +14,9 @@ import (
 type WaitFN func(*unstructured.Unstructured) (bool, string)
 
 func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	start := time.Now()
 	msg := true
 	for {
@@ -34,6 +37,9 @@ func (c *Client) WaitForNamespace(ns string, timeout time.Duration) error {
 }
 
 func (c *Client) IsNamespaceReady(ns string) (bool, string) {
+	if c.ApplyDryRun {
+		return true, ""
+	}
 	client, err := c.GetClientset()
 	if err != nil {
 		return false, err.Error()
@@ -68,6 +74,7 @@ func (c *Client) WaitFor(obj runtime.Object, timeout time.Duration) (*unstructur
 }
 
 func (c *Client) WaitForResource(kind, namespace, name string, timeout time.Duration) (*unstructured.Unstructured, error) {
+<<<<<<< HEAD
 	return c.waitForResource(kind, namespace, name, timeout, c.IsReady)
 }
 
@@ -76,6 +83,11 @@ func (c *Client) WaitForCRD(kind, namespace, name string, timeout time.Duration,
 }
 
 func (c *Client) waitForResource(kind, namespace, name string, timeout time.Duration, waitFN WaitFN) (*unstructured.Unstructured, error) {
+=======
+	if c.ApplyDryRun {
+		return nil, nil
+	}
+>>>>>>> 8767951... fix: waits should be dry-run aware
 	client, err := c.GetClientByKind(kind)
 	if err != nil {
 		return nil, err
@@ -103,6 +115,9 @@ func (c *Client) waitForResource(kind, namespace, name string, timeout time.Dura
 }
 
 func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
+	if c.ApplyDryRun {
+		return true, ""
+	}
 	if item == nil {
 		return false, "⏳ waiting to be created"
 	}
@@ -115,6 +130,7 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 			return false, "⏳ waiting for data"
 		}
 	}
+
 	if item.Object["status"] == nil {
 		return false, "⏳ waiting to become ready"
 	}
@@ -130,7 +146,14 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	}
 
 	if _, found := status["conditions"]; !found {
-		return false, "object does not expose conditions"
+		return false, "⏳ waiting to become ready"
+	}
+
+	if IsConstraintTemplate(item) {
+		if status["created"] == true {
+			return true, ""
+		}
+		return false, fmt.Sprintf("⏳ waiting for API resource to be created, created=%s", status["created"])
 	}
 
 	conditions := status["conditions"].([]interface{})
@@ -149,6 +172,9 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 // WaitForPod waits for a pod to be in the specified phase, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForPod(ns, name string, timeout time.Duration, phases ...v1.PodPhase) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	client, err := c.GetClientset()
 	if err != nil {
 		return fmt.Errorf("waitForPod: Failed to get clientset: %v", err)
@@ -180,11 +206,15 @@ func (c *Client) WaitForPod(ns, name string, timeout time.Duration, phases ...v1
 // WaitForDeployment waits for a deployment to have at least 1 ready replica, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	client, err := c.GetClientset()
 	if err != nil {
 		return err
 	}
 	deployments := client.AppsV1().Deployments(ns)
+	id := Name{Kind: "Deployment", Namespace: ns, Name: name}
 	start := time.Now()
 	msg := false
 	for {
@@ -197,7 +227,7 @@ func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error
 		}
 
 		if !msg {
-			c.Infof("%s ⏳ waiting for at least 1 pod", GetName(deployment))
+			c.Infof("%s ⏳ waiting for at least 1 pod", id)
 			msg = true
 		}
 
@@ -208,11 +238,15 @@ func (c *Client) WaitForDeployment(ns, name string, timeout time.Duration) error
 // WaitForStatefulSet waits for a statefulset to have at least 1 ready replica, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	client, err := c.GetClientset()
 	if err != nil {
 		return err
 	}
 	statefulsets := client.AppsV1().StatefulSets(ns)
+	id := Name{Kind: "Statefulset", Namespace: ns, Name: name}
 	start := time.Now()
 	msg := false
 	for {
@@ -225,7 +259,7 @@ func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) erro
 		}
 
 		if !msg {
-			c.Infof("%s ⏳ waiting for at least 1 pod", GetName(statefulset))
+			c.Infof("%s ⏳ waiting for at least 1 pod", id)
 			msg = true
 		}
 
@@ -236,6 +270,9 @@ func (c *Client) WaitForStatefulSet(ns, name string, timeout time.Duration) erro
 // WaitForDaemonSet waits for a statefulset to have at least 1 ready replica, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForDaemonSet(ns, name string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	client, err := c.GetClientset()
 	if err != nil {
 		return err
@@ -269,6 +306,9 @@ func (c *Client) WaitForDaemonSet(ns, name string, timeout time.Duration) error 
 // WaitForNode waits for a pod to be in the specified phase, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForNode(name string, timeout time.Duration, condition v1.NodeConditionType, statii ...v1.ConditionStatus) (map[v1.NodeConditionType]v1.ConditionStatus, error) {
+	if c.ApplyDryRun {
+		return nil, nil
+	}
 	start := time.Now()
 	for {
 		conditions, err := c.GetConditionsForNode(name)
@@ -288,6 +328,9 @@ func (c *Client) WaitForNode(name string, timeout time.Duration, condition v1.No
 // WaitForNode waits for a pod to be in the specified phase, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForTaintRemoval(name string, timeout time.Duration, taintKey string) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	start := time.Now()
 outerLoop:
 	for {
@@ -318,6 +361,9 @@ outerLoop:
 // WaitForPodCommand waits for a command executed in pod to succeed with an exit code of 9
 // error if the timeout is exceeded
 func (c *Client) WaitForPodCommand(ns, name string, container string, timeout time.Duration, command ...string) error {
+	if c.ApplyDryRun {
+		return nil
+	}
 	start := time.Now()
 	for {
 		stdout, stderr, err := c.ExecutePodf(ns, name, container, command...)
