@@ -26,10 +26,13 @@ func CreateKubeConfig(clusterName string, ca certs.CertificateAuthority, endpoin
 		PrivateKey: cert.PrivateKey,
 	}
 
+	if !strings.Contains(endpoint, ":") {
+		endpoint = endpoint + ":6443"
+	}
 	cfg := api.Config{
 		Clusters: map[string]*api.Cluster{
 			clusterName: {
-				Server:                "https://" + endpoint + ":6443",
+				Server:                "https://" + endpoint,
 				InsecureSkipTLSVerify: true,
 				// The CA used for signing the client certificate is not the same as the
 				// as the CA (kubernetes-ca) that signed the api-server cert. The kubernetes-ca
