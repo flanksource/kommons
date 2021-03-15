@@ -188,7 +188,8 @@ func UnwrapError(err error) string {
 func IsAPIResourceMissing(err error) bool {
 	msg := UnwrapError(err)
 	return strings.Contains(msg, "the server could not find the requested resource") ||
-		strings.Contains(msg, "no matches for kind")
+		strings.Contains(msg, "no matches for kind") ||
+		(strings.Contains(msg, "is not recognized") && strings.Contains(msg, "kind"))
 }
 
 func GetValidName(name string) string {
