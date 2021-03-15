@@ -337,19 +337,32 @@ func (c *Client) GetDynamicClientForUser(namespace string, obj runtime.Object, u
 	return c.getDynamicClientFor(dynamicClient, namespace, obj)
 }
 
-func (c *Client) getDynamicClientFor(dynamicClient dynamic.Interface, namespace string, obj runtime.Object) (dynamic.ResourceInterface, *schema.GroupVersionResource, *unstructured.Unstructured, error) {
+func (c *Client) WaitForRestMapping(obj runtime.Object, timeout time.Duration) (*meta.RESTMapping, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	gk := schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}
-	rm, _ := c.GetRestMapper()
 
-	mapping, err := rm.RESTMapping(gk, gvk.Version)
-	if err != nil && meta.IsNoMatchError(err) && !c.ApplyDryRun {
-		// new CRD may still becoming ready, flush caches and retry
-		time.Sleep(5 * time.Second)
-		c.restMapper = nil
+	start := time.Now()
+	for {
 		rm, _ := c.GetRestMapper()
-		mapping, err = rm.RESTMapping(gk, gvk.Version)
+		mapping, err := rm.RESTMapping(gk, gvk.Version)
+		if err == nil || c.ApplyDryRun {
+			return mapping, err
+		}
+		if !meta.IsNoMatchError(err) {
+			return nil, err
+		}
+		// flush rest mapper cache
+		c.restMapper = nil
+		if start.Add(2 * time.Minute).Before(time.Now()) {
+			return nil, fmt.Errorf("timeout waiting for RESTMapping for group=%s kind=%s", gk.Group, gk.Kind)
+		}
+		time.Sleep(2 * time.Second)
 	}
+
+}
+
+func (c *Client) getDynamicClientFor(dynamicClient dynamic.Interface, namespace string, obj runtime.Object) (dynamic.ResourceInterface, *schema.GroupVersionResource, *unstructured.Unstructured, error) {
+	mapping, err := c.WaitForRestMapping(obj, 2*time.Minute)
 	if err != nil {
 		return nil, nil, nil, err
 	}
