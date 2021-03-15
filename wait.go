@@ -120,7 +120,7 @@ func (c *Client) WaitForAPIResource(group, name string, timeout time.Duration) e
 
 	start := time.Now()
 	var msg string
-	id := Name{Kind: "CRD", Namespace: group, Name: name}
+	id := Name{Kind: "CustomResourceDefinition", Namespace: "*", Name: name}
 
 	for {
 		if start.Add(timeout).Before(time.Now()) {
@@ -145,7 +145,7 @@ func (c *Client) IsCRDReady(group, name string) (bool, string) {
 	}
 	_, resources, err := client.ServerGroupsAndResources()
 	if err != nil {
-		return false, "⏳ waiting API resources"
+		return false, "⏳ waiting for API resources"
 	}
 
 	for _, list := range resources {
@@ -158,11 +158,10 @@ func (c *Client) IsCRDReady(group, name string) (bool, string) {
 			}
 		}
 	}
-	return false, "⏳ waiting API resource"
+	return false, "⏳ waiting for API resource"
 }
 
 func (c *Client) IsConstraintTemplateReady(item *unstructured.Unstructured) (bool, string) {
-
 	if item.Object["status"] == nil {
 		return false, "⏳ waiting to become ready"
 	}

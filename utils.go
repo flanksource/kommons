@@ -3,10 +3,6 @@ package kommons
 import (
 	"bytes"
 	"fmt"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/flanksource/commons/console"
 	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,13 +11,17 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
+	"reflect"
 	"sigs.k8s.io/yaml"
+	"strings"
+	"time"
 )
 
 var KustomizedLabel = "kustomize/patched"
@@ -172,6 +172,23 @@ func AsPodTemplate(obj *unstructured.Unstructured) (*v1.PodTemplateSpec, error) 
 		return nil, err
 	}
 	return &spec, nil
+}
+
+func UnwrapError(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch err.(type) {
+	case *errors.StatusError:
+		return err.(*errors.StatusError).ErrStatus.Message
+	}
+	return err.Error()
+}
+
+func IsAPIResourceMissing(err error) bool {
+	msg := UnwrapError(err)
+	return strings.Contains(msg, "the server could not find the requested resource") ||
+		strings.Contains(msg, "no matches for kind")
 }
 
 func GetValidName(name string) string {

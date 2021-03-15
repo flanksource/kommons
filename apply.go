@@ -235,14 +235,9 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			extra = " " + kustomized
 		}
 		existing, err := client.Get(context.TODO(), unstructuredObj.GetName(), metav1.GetOptions{})
-		if err != nil {
-			switch err.(type) {
-			case *errors.StatusError:
-				if err.(*errors.StatusError).ErrStatus.Message == "the server could not find the requested resource" {
-					if err := c.WaitForAPIResource(unstructuredObj.GetAPIVersion(), unstructuredObj.GetKind(), 3*time.Minute); err != nil {
-						return nil
-					}
-				}
+		if IsAPIResourceMissing(err) {
+			if err := c.WaitForAPIResource(unstructuredObj.GetAPIVersion(), unstructuredObj.GetKind(), 3*time.Minute); err != nil {
+				return err
 			}
 		}
 		c.copyImmutable(existing, unstructuredObj)
