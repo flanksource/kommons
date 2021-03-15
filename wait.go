@@ -3,12 +3,12 @@ package kommons
 import (
 	"context"
 	"fmt"
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"strings"
+	"time"
 )
 
 type WaitFN func(*unstructured.Unstructured) (bool, string)
@@ -92,7 +92,9 @@ func (c *Client) waitForResource(kind, namespace, name string, timeout time.Dura
 	start := time.Now()
 	var msg string
 	id := Name{Kind: kind, Namespace: namespace, Name: name}
+
 	for {
+
 		item, _ := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 
 		if start.Add(timeout).Before(time.Now()) {
@@ -109,6 +111,78 @@ func (c *Client) waitForResource(kind, namespace, name string, timeout time.Dura
 		}
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func (c *Client) WaitForAPIResource(group, name string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
+
+	start := time.Now()
+	var msg string
+	id := Name{Kind: "CRD", Namespace: group, Name: name}
+
+	for {
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("timeout exceeded")
+		}
+		ready, message := c.IsCRDReady(group, name)
+		if ready {
+			return nil
+		}
+		if !ready && message != msg {
+			c.Infof("%s %s", id, message)
+			msg = message
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (c *Client) IsCRDReady(group, name string) (bool, string) {
+	client, err := c.GetClientset()
+	if err != nil {
+		return false, "cannot connect to api"
+	}
+	_, resources, err := client.ServerGroupsAndResources()
+	if err != nil {
+		return false, "⏳ waiting API resources"
+	}
+
+	for _, list := range resources {
+		if !strings.HasPrefix(list.GroupVersion, group) {
+			continue
+		}
+		for _, res := range list.APIResources {
+			if res.Name == strings.ToLower(name) {
+				return true, ""
+			}
+		}
+	}
+	return false, "⏳ waiting API resource"
+}
+
+func (c *Client) IsConstraintTemplateReady(item *unstructured.Unstructured) (bool, string) {
+
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+	if fmt.Sprintf("%v", item.Object["status"].(map[string]interface{})["created"]) == "true" {
+		return true, ""
+	}
+
+	return false, "⏳ waiting to be created"
+}
+
+func IsAppReady(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	status := item.Object["status"].(map[string]interface{})
+	if status["replicas"] != "" && status["replicas"] == status["readyReplicas"] {
+		return true, ""
+	}
+	return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", status["readyReplicas"], status["replicas"])
 }
 
 func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
@@ -128,29 +202,22 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		}
 	}
 
+	if IsApp(item) {
+		return IsAppReady(item)
+	}
+
+	if IsConstraintTemplate(item) {
+		return c.IsConstraintTemplateReady(item)
+	}
+
 	if item.Object["status"] == nil {
 		return false, "⏳ waiting to become ready"
 	}
 
 	status := item.Object["status"].(map[string]interface{})
 
-	if IsStatefulSet(item) || IsDeployment(item) {
-		if status["replicas"] != "" && status["replicas"] == status["readyReplicas"] {
-			return true, ""
-		} else {
-			return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", status["readyReplicas"], status["replicas"])
-		}
-	}
-
 	if _, found := status["conditions"]; !found {
 		return false, "⏳ waiting to become ready"
-	}
-
-	if IsConstraintTemplate(item) {
-		if status["created"] == true {
-			return true, ""
-		}
-		return false, fmt.Sprintf("⏳ waiting for API resource to be created, created=%s", status["created"])
 	}
 
 	conditions := status["conditions"].([]interface{})

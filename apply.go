@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/flanksource/commons/console"
 	perrors "github.com/pkg/errors"
@@ -233,7 +234,17 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 		if IsKustomized(unstructuredObj) {
 			extra = " " + kustomized
 		}
-		existing, _ := client.Get(context.TODO(), unstructuredObj.GetName(), metav1.GetOptions{})
+		existing, err := client.Get(context.TODO(), unstructuredObj.GetName(), metav1.GetOptions{})
+		if err != nil {
+			switch err.(type) {
+			case *errors.StatusError:
+				if err.(*errors.StatusError).ErrStatus.Message == "the server could not find the requested resource" {
+					if err := c.WaitForAPIResource(unstructuredObj.GetAPIVersion(), unstructuredObj.GetKind(), 3*time.Minute); err != nil {
+						return nil
+					}
+				}
+			}
+		}
 		c.copyImmutable(existing, unstructuredObj)
 		if existing == nil {
 			if c.Trace {

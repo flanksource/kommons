@@ -298,6 +298,11 @@ func IsIngress(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Ingress"
 }
 
+// IsApp returns true if the obj is a Deployment, Statetefulset or DaemonSet
+func IsApp(obj *unstructured.Unstructured) bool {
+	return IsStatefulSet(obj) || IsDeployment(obj) || IsDaemonSet(obj)
+}
+
 func IsDeployment(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Deployment"
 }
