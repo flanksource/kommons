@@ -146,6 +146,27 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	return true, ""
 }
 
+func IsElasticReady(item *unstructured.Unstructured) (bool, string) {
+	if item == nil {
+		return false, "⏳ waiting to be created"
+	}
+
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	status := item.Object["status"].(map[string]interface{})
+	phase, found := status["phase"]
+	if !found {
+		return false, "⏳ waiting to become ready"
+	}
+	if phase != "Ready" {
+		return false, "⏳ waiting to become ready"
+	}
+
+	return true, ""
+}
+
 // WaitForPod waits for a pod to be in the specified phase, or returns an
 // error if the timeout is exceeded
 func (c *Client) WaitForPod(ns, name string, timeout time.Duration, phases ...v1.PodPhase) error {
