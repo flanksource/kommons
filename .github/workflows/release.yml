@@ -15,3 +15,6 @@ jobs:
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          plugins: |
+            ['@semantic-release/release-notes-generator',  '@semantic-release/github']
