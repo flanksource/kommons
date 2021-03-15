@@ -3,6 +3,10 @@ package kommons
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/flanksource/commons/console"
 	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,10 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
-	"reflect"
 	"sigs.k8s.io/yaml"
-	"strings"
-	"time"
 )
 
 var KustomizedLabel = "kustomize/patched"
@@ -274,6 +275,10 @@ func IsNil(object runtime.Object) bool {
 	return false
 }
 
+func IsConfigMap(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "ConfigMap"
+}
+
 func IsSecret(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Secret"
 }
@@ -315,6 +320,14 @@ func IsRoleBinding(obj *unstructured.Unstructured) bool {
 
 func IsClusterRoleBinding(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "ClusterRoleBinding"
+}
+
+func IsClusterRole(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "ClusterRole"
+}
+
+func IsRole(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Role"
 }
 
 func IsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) bool {

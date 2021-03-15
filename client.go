@@ -254,6 +254,10 @@ func (c *Client) GetEtcdClientGenerator(ca *certs.Certificate) (*etcd.EtcdClient
 	}), nil
 }
 
+func (c *Client) Refresh(item *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	return c.GetByKind(item.GetKind(), item.GetNamespace(), item.GetName())
+}
+
 func (c *Client) GetClientByKind(kind string) (dynamic.NamespaceableResourceInterface, error) {
 	dynamicClient, err := c.GetDynamicClient()
 	if err != nil {
