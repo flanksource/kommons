@@ -415,7 +415,7 @@ func (c *Client) GetProxyDialer(p proxy.Proxy) (*proxy.Dialer, error) {
 	return proxy.NewDialer(p, clientset, restConfig)
 }
 
-func (c *Client) UpdateCRD(namespace string, item *unstructured.Unstructured) error {
+func (c *Client) Update(namespace string, item runtime.Object) error {
 	client, _, unstructuredObject, err := c.GetDynamicClientFor(namespace, item)
 	if err != nil {
 		return errors.Wrap(err, "failed to get dynamic client")
