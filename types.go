@@ -35,3 +35,31 @@ type RuntimeObjectWithMetadata interface {
 	GetObjectKind() schema.ObjectKind
 	DeepCopyObject() runtime.Object
 }
+
+type EnvVar struct {
+	Name      string        `json:"name" yaml:"name" protobuf:"bytes,1,opt,name=name"`
+	Value     string        `json:"value,omitempty" yaml:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
+}
+
+type EnvVarSource struct {
+	ConfigMapKeyRef  *ConfigMapKeySelector  `json:"configMapKeyRef,omitempty" yaml:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
+	SecretKeyRef     *SecretKeySelector     `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
+}
+
+type ConfigMapKeySelector struct {
+	LocalObjectReference `json:",inline" yaml:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
+	Key                  string `json:"key" yaml:"key" protobuf:"bytes,2,opt,name=key"`
+	Optional             *bool  `json:"optional,omitempty" yaml:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
+}
+
+type SecretKeySelector struct {
+	LocalObjectReference `json:",inline" yaml:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
+	Key                  string `json:"key" yaml:"key" protobuf:"bytes,2,opt,name=key"`
+	Optional             *bool  `json:"optional,omitempty" yaml:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
+}
+
+type LocalObjectReference struct {
+	Name string `json:"name,omitempty" yaml:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+}
+
