@@ -328,6 +328,39 @@ func (c *Client) GetConfigMap(namespace, name string) *map[string]string {
 	return &cm.Data
 }
 
+func (c *Client) GetEnvValue(input EnvVar, namespace string) (string, string, error) {
+	if input.Value != "" {
+		return input.Name, input.Value, nil
+	}
+	if input.ValueFrom != nil {
+		if input.ValueFrom.SecretKeyRef != nil {
+			secret := c.GetSecret(namespace, input.ValueFrom.SecretKeyRef.Name)
+			if secret == nil {
+				return "", "", perrors.New(fmt.Sprintf("Could not get contents of secret %v from namespace %v", input.ValueFrom.SecretKeyRef.Name, namespace))
+			}
+
+			value, ok := (*secret)[input.ValueFrom.SecretKeyRef.Key]
+			if !ok {
+				return input.Name, "", perrors.New(fmt.Sprintf("Could not find key %v in secret %v", input.ValueFrom.SecretKeyRef.Key, input.ValueFrom.SecretKeyRef.Name))
+			}
+			return input.Name, string(value), nil
+		}
+		if input.ValueFrom.ConfigMapKeyRef != nil {
+			cm := c.GetConfigMap(namespace, input.ValueFrom.ConfigMapKeyRef.Name)
+			if cm == nil {
+				return "", "", perrors.New(fmt.Sprintf("Could not get contents of configmap %v from namespace %v", input.ValueFrom.ConfigMapKeyRef.Name, namespace))
+			}
+			value, ok := (*cm)[input.ValueFrom.ConfigMapKeyRef.Key]
+			if !ok {
+				return input.Name, "", perrors.New(fmt.Sprintf("Could not find key %v in configmap %v", input.ValueFrom.ConfigMapKeyRef.Key, input.ValueFrom.ConfigMapKeyRef.Name))
+			}
+			return input.Name, value, nil
+		}
+	}
+	return "", "", perrors.New("could not extract value from incomplete EnvVar")
+}
+
+
 func (c *Client) GetConditionsForNode(name string) (map[v1.NodeConditionType]v1.ConditionStatus, error) {
 	client, err := c.GetClientset()
 	if err != nil {
