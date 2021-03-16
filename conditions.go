@@ -36,14 +36,13 @@ func (c *Client) GetConditions(item *unstructured.Unstructured) ([]kommonsv1.Com
 		return nil, errors.Errorf("could not get conditions for nil object")
 	}
 
-	status := item.Object["status"].(map[string]interface{})
-
-	if _, found := status["conditions"]; !found {
-		return nil, errors.Errorf("object does not expose conditions")
+	status, ok := item.Object["status"].(map[string]interface{})
+	if !ok {
+		return []kommonsv1.CommonCondition{}, nil
 	}
 
-	conditions := status["conditions"].([]interface{})
-	if len(conditions) == 0 {
+	conditions, ok := status["conditions"].([]interface{})
+	if !ok || len(conditions) == 0 {
 		return []kommonsv1.CommonCondition{}, nil
 	}
 
@@ -97,7 +96,10 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 		return nil
 	}
 
-	itemStatus := item.Object["status"].(map[string]interface{})
+	itemStatus, ok := item.Object["status"].(map[string]interface{})
+	if !ok {
+		itemStatus = map[string]interface{}{}
+	}
 	itemStatus["conditions"] = conditions
 	item.Object["status"] = itemStatus
 
