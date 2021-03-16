@@ -113,7 +113,7 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 	itemStatus["conditions"] = conditionsList
 	item.Object["status"] = itemStatus
 
-	if err := c.UpdateCRD(item.GetNamespace(), item); err != nil {
+	if err := c.Update(item.GetNamespace(), item); err != nil {
 		return errors.Wrap(err, "failed to apply status")
 	}
 	return nil
