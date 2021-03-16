@@ -4,7 +4,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type CommonCondition struct {
+// +kubebuilder:object:generate=true
+
+type Condition struct {
 	Type   string `json:"type" description:"type of common condition"`
 	Status string `json:"status" description:"status of the condition, one of Ready, NotReady, Unknown"`
 
@@ -18,3 +20,7 @@ type CommonCondition struct {
 	// +optional
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
 }
+
+// +kubebuilder:object:generate=true
+
+type ConditionList []Condition

@@ -1,9 +1,10 @@
 package kommons
 
 import (
+	"encoding/json"
+
 	kommonsv1 "github.com/flanksource/kommons/api/v1"
 	"github.com/pkg/errors"
-	"gopkg.in/flanksource/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -31,28 +32,28 @@ func (c *Client) IsTrivialType(item *unstructured.Unstructured) bool {
 	return true
 }
 
-func (c *Client) GetConditions(item *unstructured.Unstructured) ([]kommonsv1.CommonCondition, error) {
+func (c *Client) GetConditions(item *unstructured.Unstructured) (kommonsv1.ConditionList, error) {
 	if item == nil {
 		return nil, errors.Errorf("could not get conditions for nil object")
 	}
 
 	status, ok := item.Object["status"].(map[string]interface{})
 	if !ok {
-		return []kommonsv1.CommonCondition{}, nil
+		return kommonsv1.ConditionList{}, nil
 	}
 
 	conditions, ok := status["conditions"].([]interface{})
 	if !ok || len(conditions) == 0 {
-		return []kommonsv1.CommonCondition{}, nil
+		return kommonsv1.ConditionList{}, nil
 	}
 
-	yml, err := yaml.Marshal(conditions)
+	js, err := json.Marshal(conditions)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal conditions")
 	}
 
-	commonConditions := []kommonsv1.CommonCondition{}
-	if err := yaml.Unmarshal(yml, commonConditions); err != nil {
+	commonConditions := kommonsv1.ConditionList{}
+	if err := json.Unmarshal(js, &commonConditions); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal conditions")
 	}
 
@@ -83,7 +84,7 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 
 	if !found {
 		changed = true
-		condition := kommonsv1.CommonCondition{
+		condition := kommonsv1.Condition{
 			Type:               kind,
 			Status:             status,
 			LastHeartbeatTime:  &now,
@@ -96,15 +97,24 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 		return nil
 	}
 
+	conditionsJson, err := json.Marshal(conditions)
+	if err != nil {
+		return errors.Wrap(err, "failed to encode conditions to json")
+	}
+	conditionsList := []interface{}{}
+	if err := json.Unmarshal(conditionsJson, &conditionsList); err != nil {
+		return errors.Wrap(err, "failed to decode conditions json")
+	}
+
 	itemStatus, ok := item.Object["status"].(map[string]interface{})
 	if !ok {
 		itemStatus = map[string]interface{}{}
 	}
-	itemStatus["conditions"] = conditions
+	itemStatus["conditions"] = conditionsList
 	item.Object["status"] = itemStatus
 
-	if err := c.ApplyUnstructured(item.GetNamespace(), item); err != nil {
-		return errors.Wrap(err, "failed to apply status conditions")
+	if err := c.UpdateCRD(item.GetNamespace(), item); err != nil {
+		return errors.Wrap(err, "failed to apply status")
 	}
 	return nil
 }

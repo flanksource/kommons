@@ -24,6 +24,7 @@ import (
 	"github.com/flanksource/kommons/etcd"
 	"github.com/flanksource/kommons/kustomize"
 	"github.com/flanksource/kommons/proxy"
+	"github.com/pkg/errors"
 	perrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -412,6 +413,16 @@ func (c *Client) GetProxyDialer(p proxy.Proxy) (*proxy.Dialer, error) {
 	}
 
 	return proxy.NewDialer(p, clientset, restConfig)
+}
+
+func (c *Client) UpdateCRD(namespace string, item *unstructured.Unstructured) error {
+	client, _, unstructuredObject, err := c.GetDynamicClientFor(namespace, item)
+	if err != nil {
+		return errors.Wrap(err, "failed to get dynamic client")
+	}
+
+	_, err = client.Update(context.TODO(), unstructuredObject, metav1.UpdateOptions{})
+	return err
 }
 
 func (c *Client) GetEtcdClient(ctx context.Context) (*etcd.Client, error) {
