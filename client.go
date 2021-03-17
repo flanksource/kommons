@@ -98,6 +98,9 @@ func NewClientFromBytes(kubeconfig []byte) (*Client, error) {
 		GetKubeConfigBytes: func() ([]byte, error) {
 			return kubeconfig, nil
 		},
+		GetKustomizePatches: func() ([]string, error) {
+			return []string{}, nil
+		},
 	}
 	client.GetRESTConfig = client.GetRESTConfigFromKubeconfig
 	return client, nil
@@ -110,6 +113,9 @@ func NewClient(config *rest.Config, logger logger.Logger) *Client {
 		Logger:               logger,
 		GetRESTConfig: func() (*rest.Config, error) {
 			return config, nil
+		},
+		GetKustomizePatches: func() ([]string, error) {
+			return []string{}, nil
 		},
 	}
 }
