@@ -3,12 +3,14 @@ package kommons
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"strings"
-	"time"
 )
 
 type WaitFN func(*unstructured.Unstructured) (bool, string)
@@ -192,20 +194,29 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return false, "⏳ waiting to be created"
 	}
 
-	if IsSecret(item) {
+	switch {
+	case IsSecret(item):
 		data, found, _ := unstructured.NestedMap(item.Object, "data")
 		if found && len(data) > 0 {
 			return true, ""
 		} else {
 			return false, "⏳ waiting for data"
 		}
-	}
-
-	if IsApp(item) {
+	case IsStatefulSet(item):
+		return IsUnstructuredStatefulSetReady(item)
+	case IsDeployment(item):
+		return IsUnstructuredDeploymentReady(item)
+	case IsElasticsearch(item):
+		return c.IsElasticsearchReady(item)
+	case IsKibana(item):
+		return c.IsKibanaReady(item)
+	case IsRedisFailover(item):
+		return c.IsRedisFailoverReady(item)
+	case IsPostgresql(item):
+		return c.IsPostgresqlReady(item)
+	case IsApp(item):
 		return IsAppReady(item)
-	}
-
-	if IsConstraintTemplate(item) {
+	case IsConstraintTemplate(item):
 		return c.IsConstraintTemplateReady(item)
 	}
 
@@ -251,6 +262,129 @@ func IsElasticReady(item *unstructured.Unstructured) (bool, string) {
 	}
 
 	return true, ""
+}
+
+func (c *Client) IsElasticsearchReady(item *unstructured.Unstructured) (bool, string) {
+	name := item.GetName()
+	namespace := item.GetNamespace()
+
+	stsName := fmt.Sprintf("%s-es-default", name)
+
+	clientset, err := c.GetClientset()
+	if err != nil {
+		return false, fmt.Sprintf("failed to get clientset: %v", err)
+	}
+
+	sts, err := clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), stsName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get sts %s: %v", stsName, err)
+	}
+
+	return IsStatefulSetReady(sts)
+}
+
+func (c *Client) IsKibanaReady(item *unstructured.Unstructured) (bool, string) {
+	name := item.GetName()
+	namespace := item.GetNamespace()
+
+	kbName := fmt.Sprintf("%s-kb", name)
+
+	clientset, err := c.GetClientset()
+	if err != nil {
+		return false, fmt.Sprintf("failed to get clientset: %v", err)
+	}
+
+	kb, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), kbName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get deployment %s: %v", kbName, err)
+	}
+
+	return IsDeploymentReady(kb)
+}
+
+func (c *Client) IsRedisFailoverReady(item *unstructured.Unstructured) (bool, string) {
+	name := item.GetName()
+	namespace := item.GetNamespace()
+
+	stsName := fmt.Sprintf("rfr-%s", name)
+	deplName := fmt.Sprintf("rfs-%s", name)
+
+	clientset, err := c.GetClientset()
+	if err != nil {
+		return false, fmt.Sprintf("failed to get clientset: %v", err)
+	}
+
+	sts, err := clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), stsName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get sts %s: %v", stsName, err)
+	}
+
+	depl, err := clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deplName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get deployment %s: %v", deplName, err)
+	}
+
+	stsReady, stsMsg := IsStatefulSetReady(sts)
+	deplReady, deplMsg := IsDeploymentReady(depl)
+
+	msgs := []string{}
+	if !stsReady {
+		msgs = append(msgs, stsMsg)
+	}
+	if !deplReady {
+		msgs = append(msgs, deplMsg)
+	}
+	msg := strings.Join(msgs, "; ")
+	return stsReady && deplReady, msg
+}
+
+func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, string) {
+	name := item.GetName()
+	namespace := item.GetNamespace()
+
+	clientset, err := c.GetClientset()
+	if err != nil {
+		return false, fmt.Sprintf("failed to get clientset: %v", err)
+	}
+
+	sts, err := clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get sts %s: %v", name, err)
+	}
+
+	return IsStatefulSetReady(sts)
+}
+
+func IsUnstructuredStatefulSetReady(item *unstructured.Unstructured) (bool, string) {
+	sts, err := AsStatefulSet(item)
+	if err != nil {
+		return false, fmt.Sprintf("failed to convert to statefulset: %v", err)
+	}
+	return IsStatefulSetReady(sts)
+}
+
+func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
+	if sts.Status.Replicas == sts.Status.Replicas {
+		return true, ""
+	} else {
+		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", sts.Status.ReadyReplicas, sts.Status.Replicas)
+	}
+}
+
+func IsUnstructuredDeploymentReady(item *unstructured.Unstructured) (bool, string) {
+	deployment, err := AsDeployment(item)
+	if err != nil {
+		return false, fmt.Sprintf("failed to convert to deployment: %v", err)
+	}
+	return IsDeploymentReady(deployment)
+}
+
+func IsDeploymentReady(d *appsv1.Deployment) (bool, string) {
+	if d.Status.Replicas == d.Status.Replicas {
+		return true, ""
+	} else {
+		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", d.Status.ReadyReplicas, d.Status.Replicas)
+	}
 }
 
 // WaitForPod waits for a pod to be in the specified phase, or returns an
