@@ -202,10 +202,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		} else {
 			return false, "⏳ waiting for data"
 		}
-	case IsStatefulSet(item):
-		return IsUnstructuredStatefulSetReady(item)
-	case IsDeployment(item):
-		return IsUnstructuredDeploymentReady(item)
+	case IsApp(item):
+		return IsAppReady(item)
 	case IsElasticsearch(item):
 		return c.IsElasticsearchReady(item)
 	case IsKibana(item):
@@ -214,8 +212,6 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return c.IsRedisFailoverReady(item)
 	case IsPostgresql(item):
 		return c.IsPostgresqlReady(item)
-	case IsApp(item):
-		return IsAppReady(item)
 	case IsConstraintTemplate(item):
 		return c.IsConstraintTemplateReady(item)
 	}
@@ -355,28 +351,12 @@ func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, strin
 	return IsStatefulSetReady(sts)
 }
 
-func IsUnstructuredStatefulSetReady(item *unstructured.Unstructured) (bool, string) {
-	sts, err := AsStatefulSet(item)
-	if err != nil {
-		return false, fmt.Sprintf("failed to convert to statefulset: %v", err)
-	}
-	return IsStatefulSetReady(sts)
-}
-
 func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
 	if sts.Status.Replicas == sts.Status.Replicas {
 		return true, ""
 	} else {
 		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", sts.Status.ReadyReplicas, sts.Status.Replicas)
 	}
-}
-
-func IsUnstructuredDeploymentReady(item *unstructured.Unstructured) (bool, string) {
-	deployment, err := AsDeployment(item)
-	if err != nil {
-		return false, fmt.Sprintf("failed to convert to deployment: %v", err)
-	}
-	return IsDeploymentReady(deployment)
 }
 
 func IsDeploymentReady(d *appsv1.Deployment) (bool, string) {
