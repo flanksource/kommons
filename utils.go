@@ -3,6 +3,10 @@ package kommons
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/flanksource/commons/console"
 	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -18,10 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
-	"reflect"
 	"sigs.k8s.io/yaml"
-	"strings"
-	"time"
 )
 
 var KustomizedLabel = "kustomize/patched"
@@ -356,6 +357,14 @@ func IsRole(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Role"
 }
 
+func IsCronJob(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "CronJob"
+}
+
+func IsCanary(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Canary"
+}
+
 func IsCustomResourceDefinitionV1Beta1(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "CustomResourceDefinition" && obj.GetAPIVersion() == "apiextensions.k8s.io/v1beta1"
 }
@@ -366,6 +375,22 @@ func IsCustomResourceDefinition(obj *unstructured.Unstructured) bool {
 
 func IsConstraintTemplate(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "ConstraintTemplate"
+}
+
+func IsElasticsearch(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Elasticsearch"
+}
+
+func IsKibana(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Kibana"
+}
+
+func IsRedisFailover(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "RedisFailover"
+}
+
+func IsPostgresql(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "postgresql"
 }
 
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {

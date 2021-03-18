@@ -13,9 +13,12 @@ type IsType func(*unstructured.Unstructured) bool
 
 var (
 	TrivialTypes = map[string]IsType{
-		"ConfigMap":             IsConfigMap,
+		"Canary":                IsCanary,
 		"ClusterRole":           IsClusterRole,
 		"ClusterRoleBinding":    IsClusterRoleBinding,
+		"ConfigMap":             IsConfigMap,
+		"CronJob":               IsCronJob,
+		"Ingress":               IsIngress,
 		"PersistentVolumeClaim": IsPVC,
 		"Role":                  IsRole,
 		"RoleBinding":           IsRoleBinding,
@@ -26,10 +29,10 @@ var (
 func (c *Client) IsTrivialType(item *unstructured.Unstructured) bool {
 	for _, v := range TrivialTypes {
 		if v(item) {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func (c *Client) GetConditions(item *unstructured.Unstructured) (kommonsv1.ConditionList, error) {
@@ -70,15 +73,15 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 	changed := false
 	now := metav1.Now()
 
-	for _, condition := range conditions {
-		if condition.Type == kind {
+	for i := range conditions {
+		if conditions[i].Type == kind {
 			found = true
-			if condition.Status != status {
+			if conditions[i].Status != status {
 				changed = true
-				condition.Status = status
-				condition.LastTransitionTime = &now
+				conditions[i].Status = status
+				conditions[i].LastTransitionTime = &now
 			}
-			condition.LastHeartbeatTime = &now
+			conditions[i].LastHeartbeatTime = &now
 		}
 	}
 
