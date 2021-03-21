@@ -214,6 +214,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return c.IsPostgresqlReady(item)
 	case IsConstraintTemplate(item):
 		return c.IsConstraintTemplateReady(item)
+	case IsMongoDB(item):
+		return c.IsMongoDBReady(item)
 	}
 
 	if item.Object["status"] == nil {
@@ -254,6 +256,21 @@ func IsElasticReady(item *unstructured.Unstructured) (bool, string) {
 		return false, "⏳ waiting to become ready"
 	}
 	if phase != "Ready" {
+		return false, "⏳ waiting to become ready"
+	}
+
+	return true, ""
+}
+
+func (c *Client) IsMongoDBReady(item *unstructured.Unstructured) (bool, string) {
+	status := item.Object["status"]
+
+	if status == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	state := item.Object["status"].(map[string]interface{})["state"]
+	if state != "ready" {
 		return false, "⏳ waiting to become ready"
 	}
 
