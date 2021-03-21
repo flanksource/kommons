@@ -393,6 +393,10 @@ func IsPostgresql(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "postgresql"
 }
 
+func IsMongoDB(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "PerconaServerMongoDB"
+}
+
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)
