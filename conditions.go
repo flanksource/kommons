@@ -2,6 +2,7 @@ package kommons
 
 import (
 	"encoding/json"
+	"fmt"
 
 	kommonsv1 "github.com/flanksource/kommons/api/v1"
 	"github.com/pkg/errors"
@@ -120,4 +121,31 @@ func (c *Client) SetCondition(item *unstructured.Unstructured, kind, status stri
 		return errors.Wrap(err, "failed to apply status")
 	}
 	return nil
+}
+
+func (c *Client) IsReadyWithConditions(item *unstructured.Unstructured) (bool, string) {
+	conditions, err := c.GetConditions(item)
+	if err != nil {
+		return false, fmt.Sprintf("failed to get conditions: %v", err)
+	}
+
+	found := false
+	ready := true
+
+	for _, c := range conditions {
+		if c.Status == "Ready" {
+			found = true
+		} else if c.Status == "NotReady" {
+			found = true
+			ready = false
+		}
+	}
+
+	if !found {
+		return false, fmt.Sprintf("⏳ waiting for conditions")
+	} else if !ready {
+		return false, fmt.Sprintf("⏳ waiting for conditions to be ready")
+	}
+
+	return true, ""
 }
