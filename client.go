@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 
 	"net"
 	"net/http"
@@ -503,6 +504,26 @@ func (c *Client) GetJobPod(namespace, jobName string) (string, error) {
 	} else {
 		return podsByLabel.Items[0].Name, nil
 	}
+}
+
+func (c *Client) GetPodLogs(namespace, podName, container string) (string, error) {
+	client, err := c.GetClientset()
+	if err != nil {
+		return "", err
+	}
+	podLogOptions := v1.PodLogOptions{}
+	if container != "" {
+		podLogOptions.Container = container
+	}
+	req := client.CoreV1().Pods(namespace).GetLogs(podName, &podLogOptions)
+	podLogs, err := req.Stream(context.TODO())
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	return buf.String(), nil
 }
 
 func (c *Client) StreamLogs(namespace, name string) error {
