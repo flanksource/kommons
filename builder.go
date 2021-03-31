@@ -106,6 +106,7 @@ type DeploymentBuilder struct {
 	labels          map[string]string
 	annotations     map[string]string
 	env             []v1.EnvVar
+	envFrom         []v1.EnvFromSource
 	nodeAffinity    *v1.Affinity
 	podAffinity     *v1.Affinity
 	cmd             []string
@@ -113,6 +114,28 @@ type DeploymentBuilder struct {
 
 func (d *DeploymentBuilder) Command(cmd ...string) *DeploymentBuilder {
 	d.cmd = append(d.cmd, cmd...)
+	return d
+}
+
+func (d *DeploymentBuilder) EnvFromConfigMap(name string) *DeploymentBuilder {
+	d.envFrom = append(d.envFrom, v1.EnvFromSource{
+		ConfigMapRef: &v1.ConfigMapEnvSource{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: name,
+			},
+		},
+	})
+	return d
+}
+
+func (d *DeploymentBuilder) EnvFromSecret(name string) *DeploymentBuilder {
+	d.envFrom = append(d.envFrom, v1.EnvFromSource{
+		SecretRef: &v1.SecretEnvSource{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: name,
+			},
+		},
+	})
 	return d
 }
 
@@ -192,6 +215,7 @@ func (d *DeploymentBuilder) PodSpec() v1.PodSpec {
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Ports:           d.ports,
 				VolumeMounts:    d.volumeMounts,
+				EnvFrom:         d.envFrom,
 				Env:             d.env,
 				Args:            d.args,
 				Resources:       d.resources,
@@ -213,7 +237,7 @@ func (d *DeploymentBuilder) PodTemplate() v1.PodTemplateSpec {
 	}
 }
 
-func (d *DeploymentBuilder) AsOneShotJob() *v1.Pod {
+func (d *DeploymentBuilder) AsOneShotPod() *v1.Pod {
 	pod := v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -224,6 +248,27 @@ func (d *DeploymentBuilder) AsOneShotJob() *v1.Pod {
 	}
 	pod.Spec.RestartPolicy = "Never"
 	return &pod
+}
+
+func (d *DeploymentBuilder) AsOneShotJob() *batchv1.Job {
+	ttlSecondsAfterFinished := int32(360)
+	backoffLimit := int32(0)
+
+	pod := d.PodTemplate()
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+	return &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+		},
+		ObjectMeta: d.Builder.ObjectMeta(d.Name),
+		Spec: batchv1.JobSpec{
+			Template:                pod,
+			TTLSecondsAfterFinished: &ttlSecondsAfterFinished,
+			BackoffLimit:            &backoffLimit,
+		},
+	}
 }
 
 func (d *DeploymentBuilder) EnvVars(env map[string]string) *DeploymentBuilder {

@@ -474,6 +474,37 @@ func (c *Client) GetEtcdClient(ctx context.Context) (*etcd.Client, error) {
 	return etcdClient, nil
 }
 
+func (c *Client) GetJobPod(namespace, jobName string) (string, error) {
+	client, err := c.GetClientset()
+	if err != nil {
+		return "", err
+	}
+	jobs := client.BatchV1().Jobs(namespace)
+	job, err := jobs.Get(context.TODO(), jobName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	c.Debugf("Waiting for %s/%s to be running", namespace, jobName)
+	controllerUid := job.Labels["controller-uid"]
+	if controllerUid == "" {
+		return "", fmt.Errorf("couldn't find pod of Job: s%/%s", namespace, jobName)
+	}
+
+	pods := client.CoreV1().Pods(namespace)
+	podsByLabel, err := pods.List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("controller-uid=%s", controllerUid),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(podsByLabel.Items) < 1 {
+		return "", fmt.Errorf("couldn't find pod of Job: s%/%s", namespace, jobName)
+	} else {
+		return podsByLabel.Items[0].Name, nil
+	}
+}
+
 func (c *Client) StreamLogs(namespace, name string) error {
 	client, err := c.GetClientset()
 	if err != nil {
