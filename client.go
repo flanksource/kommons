@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/flanksource/commons/utils"
 	"io"
 
 	"net"
@@ -27,6 +28,7 @@ import (
 	"github.com/flanksource/kommons/proxy"
 	"github.com/pkg/errors"
 	perrors "github.com/pkg/errors"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -581,4 +583,30 @@ func (c *Client) StreamLogs(namespace, name string) error {
 		return nil
 	}
 	return fmt.Errorf("pod did not finish successfully %s - %s", pod.Status.Phase, pod.Status.Message)
+}
+
+// TriggerCronJobManually creates a Job from the cronJobName passed to the function and return the created job's name
+func (c *Client) TriggerCronJobManually(namespace, cronJobName string) (string, error) {
+	client, err := c.GetClientset()
+	if err != nil {
+		return "", err
+	}
+	cronJob, err := client.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), cronJobName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	job, err := client.BatchV1().Jobs(namespace).Create(context.TODO(), &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Job",
+			APIVersion: "batch/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-manual-%s", cronJobName, utils.RandomString(3)),
+		},
+		Spec: cronJob.Spec.JobTemplate.Spec,
+	}, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	return job.Name, nil
 }
