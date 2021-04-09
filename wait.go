@@ -368,7 +368,7 @@ func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, strin
 }
 
 func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
-	if sts.Status.Replicas == sts.Status.Replicas {
+	if *sts.Spec.Replicas == sts.Status.ReadyReplicas {
 		return true, ""
 	} else {
 		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", sts.Status.ReadyReplicas, sts.Status.Replicas)
@@ -376,7 +376,7 @@ func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
 }
 
 func IsDeploymentReady(d *appsv1.Deployment) (bool, string) {
-	if d.Status.Replicas == d.Status.Replicas {
+	if *d.Spec.Replicas == d.Status.ReadyReplicas {
 		return true, ""
 	} else {
 		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", d.Status.ReadyReplicas, d.Status.Replicas)
