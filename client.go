@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/flanksource/commons/utils"
 	"io"
 
 	"net"
@@ -23,6 +22,7 @@ import (
 	certs "github.com/flanksource/commons/certs"
 	"github.com/flanksource/commons/files"
 	"github.com/flanksource/commons/logger"
+	"github.com/flanksource/commons/utils"
 	"github.com/flanksource/kommons/etcd"
 	"github.com/flanksource/kommons/kustomize"
 	"github.com/flanksource/kommons/proxy"
