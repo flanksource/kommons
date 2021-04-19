@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -369,7 +370,7 @@ func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, strin
 }
 
 func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
-	if sts.Status.Replicas == sts.Status.Replicas {
+	if *sts.Spec.Replicas == sts.Status.ReadyReplicas {
 		return true, ""
 	} else {
 		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", sts.Status.ReadyReplicas, sts.Status.Replicas)
@@ -377,10 +378,37 @@ func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
 }
 
 func IsDeploymentReady(d *appsv1.Deployment) (bool, string) {
-	if d.Status.Replicas == d.Status.Replicas {
+	if *d.Spec.Replicas == d.Status.ReadyReplicas {
 		return true, ""
 	} else {
 		return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", d.Status.ReadyReplicas, d.Status.Replicas)
+	}
+}
+
+// WaitForJob waits for a job to finish (the condition type "Complete" has status of "True"), or returns an error if the timeout is exceeded
+func (c *Client) WaitForJob(ns, name string, timeout time.Duration) error {
+	if c.ApplyDryRun {
+		return nil
+	}
+	client, err := c.GetClientset()
+	if err != nil {
+		return fmt.Errorf("waitForJob: Failed to get clientset: %v", err)
+	}
+	jobs := client.BatchV1().Jobs(ns)
+	start := time.Now()
+	for {
+		job, _ := jobs.Get(context.TODO(), name, metav1.GetOptions{})
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("timeout exceeded waiting for Job to finish")
+		}
+		if conditions := job.Status.Conditions; conditions != nil {
+			for _, condition := range conditions {
+				if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
+					return nil
+				}
+			}
+		}
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -540,8 +568,6 @@ func (c *Client) WaitForNode(name string, timeout time.Duration, condition v1.No
 	}
 }
 
-// WaitForNode waits for a pod to be in the specified phase, or returns an
-// error if the timeout is exceeded
 func (c *Client) WaitForTaintRemoval(name string, timeout time.Duration, taintKey string) error {
 	if c.ApplyDryRun {
 		return nil
