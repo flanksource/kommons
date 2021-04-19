@@ -353,18 +353,20 @@ func (c *Client) IsRedisFailoverReady(item *unstructured.Unstructured) (bool, st
 }
 
 func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, string) {
-	status := item.Object["status"]
+	name := item.GetName()
+	namespace := item.GetNamespace()
 
-	if status == nil {
-		return false, "⏳ waiting to become ready"
+	clientset, err := c.GetClientset()
+	if err != nil {
+		return false, fmt.Sprintf("failed to get clientset: %v", err)
 	}
 
-	state := item.Object["status"].(map[string]interface{})["PostgresClusterStatus"]
-	if state != "Running" {
-		return false, "⏳ waiting to become ready"
+	sts, err := clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("failed to get sts %s: %v", name, err)
 	}
 
-	return true, ""
+	return IsStatefulSetReady(sts)
 }
 
 func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
