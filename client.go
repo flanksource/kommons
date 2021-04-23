@@ -483,29 +483,34 @@ func (c *Client) GetJobPod(namespace, jobName string) (string, error) {
 		return "", err
 	}
 	jobs := client.BatchV1().Jobs(namespace)
-	job, err := jobs.Get(context.TODO(), jobName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
 	c.Debugf("Waiting for %s/%s to be running", namespace, jobName)
-	controllerUid := job.Labels["controller-uid"]
-	if controllerUid == "" {
-		return "", fmt.Errorf("couldn't find pod of Job: s%/%s", namespace, jobName)
+
+	start := time.Now()
+	timeout := 1 * time.Minute
+	for {
+		job, err := jobs.Get(context.TODO(), jobName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		controllerUid := job.Labels["controller-uid"]
+		if controllerUid != "" {
+			pods := client.CoreV1().Pods(namespace)
+			podsByLabel, err := pods.List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("controller-uid=%s", controllerUid),
+			})
+			if err != nil {
+				return "", err
+			}
+			if len(podsByLabel.Items) > 0 {
+				return podsByLabel.Items[0].Name, nil
+			}
+		}
+		if start.Add(timeout).Before(time.Now()) {
+			return "", fmt.Errorf("couldn't find pod of Job: %s/%s after %s", namespace, jobName, timeout)
+		}
+		time.Sleep(1 * time.Second)
 	}
 
-	pods := client.CoreV1().Pods(namespace)
-	podsByLabel, err := pods.List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("controller-uid=%s", controllerUid),
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if len(podsByLabel.Items) < 1 {
-		return "", fmt.Errorf("couldn't find pod of Job: s%/%s", namespace, jobName)
-	} else {
-		return podsByLabel.Items[0].Name, nil
-	}
 }
 
 func (c *Client) GetPodLogs(namespace, podName, container string) (string, error) {
