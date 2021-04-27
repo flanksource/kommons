@@ -316,6 +316,7 @@ func IsService(obj *unstructured.Unstructured) bool {
 func IsServiceAccount(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "ServiceAccount"
 }
+
 func IsIngress(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Ingress"
 }
@@ -390,7 +391,11 @@ func IsRedisFailover(obj *unstructured.Unstructured) bool {
 }
 
 func IsPostgresql(obj *unstructured.Unstructured) bool {
-	return obj.GetKind() == "postgresql"
+	return strings.ToLower(obj.GetKind()) == "postgresql"
+}
+
+func IsPostgresqlDB(obj *unstructured.Unstructured) bool {
+	return strings.ToLower(obj.GetKind()) == "postgresqldb"
 }
 
 func IsMongoDB(obj *unstructured.Unstructured) bool {

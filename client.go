@@ -289,6 +289,9 @@ func (c *Client) GetClientByKind(kind string) (dynamic.NamespaceableResourceInte
 }
 
 func (c *Client) GetDynamicClientFor(namespace string, obj runtime.Object) (dynamic.ResourceInterface, *schema.GroupVersionResource, *unstructured.Unstructured, error) {
+	if obj.GetObjectKind().GroupVersionKind().Kind == "" {
+		return nil, nil, nil, fmt.Errorf("cannot apply object, missing kind: %v", obj)
+	}
 	dynamicClient, err := c.GetDynamicClient()
 	if err != nil {
 		return nil, nil, nil, perrors.Wrap(err, "failed to get dynamic client")
