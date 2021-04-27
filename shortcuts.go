@@ -39,15 +39,18 @@ func (c *Client) CreateOrUpdateNamespace(name string, labels, annotations map[st
 	cm, err := ns.Get(context.TODO(), name, metav1.GetOptions{})
 
 	if cm == nil || err != nil {
-		cm = &v1.Namespace{}
+		cm = &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Namespace",
+				APIVersion: "v1",
+			},
+		}
 		cm.Name = name
 		cm.Labels = labels
 		cm.Annotations = annotations
 
 		if !c.ApplyDryRun {
-			if _, err := ns.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-				return err
-			}
+			return c.Apply("", cm)
 		}
 	} else {
 		// update incoming and current labels
@@ -69,10 +72,12 @@ func (c *Client) CreateOrUpdateNamespace(name string, labels, annotations map[st
 	(*cm).Name = name
 	(*cm).Labels = labels
 	(*cm).Annotations = annotations
+	(*cm).TypeMeta = metav1.TypeMeta{
+		Kind:       "Namespace",
+		APIVersion: "v1",
+	}
 	if !c.ApplyDryRun {
-		if _, err := ns.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
-			return err
-		}
+		return c.Apply("", cm)
 	}
 	return nil
 }
@@ -359,7 +364,6 @@ func (c *Client) GetEnvValue(input EnvVar, namespace string) (string, string, er
 	}
 	return "", "", perrors.New("could not extract value from incomplete EnvVar")
 }
-
 
 func (c *Client) GetConditionsForNode(name string) (map[v1.NodeConditionType]v1.ConditionStatus, error) {
 	client, err := c.GetClientset()

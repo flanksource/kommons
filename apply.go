@@ -193,6 +193,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 		if IsNil(obj) {
 			continue
 		}
+
 		client, _, unstructuredObj, err := c.GetDynamicClientFor(namespace, obj)
 		if IsAPIResourceMissing(err) {
 			if err := c.WaitForAPIResource(unstructuredObj.GetAPIVersion(), unstructuredObj.GetKind(), 3*time.Minute); err != nil {

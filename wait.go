@@ -194,6 +194,7 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	if item == nil {
 		return false, "⏳ waiting to be created"
 	}
+	c.Debugf("[%s] checking readiness", GetName(item))
 
 	switch {
 	case IsSecret(item):
@@ -211,6 +212,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return c.IsKibanaReady(item)
 	case IsRedisFailover(item):
 		return c.IsRedisFailoverReady(item)
+	case IsPostgresqlDB(item):
+		return c.IsPostgresqlDBReady(item)
 	case IsPostgresql(item):
 		return c.IsPostgresqlReady(item)
 	case IsConstraintTemplate(item):
@@ -352,21 +355,37 @@ func (c *Client) IsRedisFailoverReady(item *unstructured.Unstructured) (bool, st
 	return stsReady && deplReady, msg
 }
 
-func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, string) {
-	name := item.GetName()
-	namespace := item.GetNamespace()
+func (c *Client) IsPostgresqlDBReady(item *unstructured.Unstructured) (bool, string) {
+	// PostgresqlDB instances are backed by zalando postgres instances
+	return c.isPostgresqlReady(item.GetNamespace(), "postgres-"+item.GetName())
+}
 
+func (c *Client) IsPostgresqlReady(item *unstructured.Unstructured) (bool, string) {
+	return c.isPostgresqlReady(item.GetNamespace(), item.GetName())
+}
+
+func (c *Client) isPostgresqlReady(namespace, name string) (bool, string) {
 	clientset, err := c.GetClientset()
 	if err != nil {
 		return false, fmt.Sprintf("failed to get clientset: %v", err)
 	}
 
+	// zalando postgres instances are backed by a stateful set
 	sts, err := clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return false, fmt.Sprintf("failed to get sts %s: %v", name, err)
+		return false, fmt.Sprintf("⏳ waiting for statefulset")
 	}
 
-	return IsStatefulSetReady(sts)
+	if ready, msg := IsStatefulSetReady(sts); ready {
+		// once the sts is up, check that the postgres instance is up and serving queries
+		if err := c.WaitForPodCommand(namespace, name+"-0", "postgres", 30*time.Second, "su", "postgres", "-c", "psql -c 'SELECT 1;'"); err == nil {
+			return true, ""
+		} else {
+			return false, "⏳ waiting for postgres to be running: " + err.Error()
+		}
+	} else {
+		return ready, msg
+	}
 }
 
 func IsStatefulSetReady(sts *appsv1.StatefulSet) (bool, string) {
@@ -408,6 +427,38 @@ func (c *Client) WaitForJob(ns, name string, timeout time.Duration) error {
 				}
 			}
 		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// WaitForPod waits for a pod to be in the specified phase, or returns an
+// error if the timeout is exceeded
+func (c *Client) WaitForPodByLabel(ns, label string, timeout time.Duration, phases ...v1.PodPhase) (*v1.Pod, error) {
+	if c.ApplyDryRun {
+		return &v1.Pod{}, nil
+	}
+	client, err := c.GetClientset()
+	if err != nil {
+		return nil, err
+	}
+	pods := client.CoreV1().Pods(ns)
+	id := Name{Kind: "Pod", Namespace: ns, Name: label}
+	start := time.Now()
+	msg := false
+	for {
+		items, _ := pods.List(context.TODO(), metav1.ListOptions{LabelSelector: label})
+		if items != nil && len(items.Items) > 0 {
+			return &items.Items[0], nil
+		}
+		if start.Add(timeout).Before(time.Now()) {
+			return nil, fmt.Errorf("timeout exceeded waiting for pod %s", id)
+		}
+
+		if !msg {
+			c.Infof("%s ⏳ waiting for pod", id)
+			msg = true
+		}
+
 		time.Sleep(2 * time.Second)
 	}
 }
@@ -599,7 +650,7 @@ outerLoop:
 	}
 }
 
-// WaitForPodCommand waits for a command executed in pod to succeed with an exit code of 9
+// WaitForPodCommand waits for a command executed in pod to succeed with an exit code of 0
 // error if the timeout is exceeded
 func (c *Client) WaitForPodCommand(ns, name string, container string, timeout time.Duration, command ...string) error {
 	if c.ApplyDryRun {
@@ -612,7 +663,7 @@ func (c *Client) WaitForPodCommand(ns, name string, container string, timeout ti
 			return nil
 		}
 		if start.Add(timeout).Before(time.Now()) {
-			return fmt.Errorf("timeout exceeded waiting for %s stdout: %s, stderr: %s", name, stdout, stderr)
+			return fmt.Errorf("timeout exceeded waiting for %s: %v, stdout: %s, stderr: %s", name, command, stdout, stderr)
 		}
 		time.Sleep(5 * time.Second)
 	}
