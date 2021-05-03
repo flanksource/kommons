@@ -402,6 +402,14 @@ func IsMongoDB(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "PerconaServerMongoDB"
 }
 
+func IsBuilder(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Builder"
+}
+
+func IsImage(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Image"
+}
+
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)

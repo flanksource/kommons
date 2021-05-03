@@ -220,6 +220,10 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return c.IsConstraintTemplateReady(item)
 	case IsMongoDB(item):
 		return c.IsMongoDBReady(item)
+	case IsBuilder(item):
+		return IsBuilderReady(item)
+	case IsImage(item):
+		return IsImageReady(item)
 	}
 
 	if item.Object["status"] == nil {
@@ -241,6 +245,52 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		if condition["type"] != "Ready" && condition["status"] != "True" {
 			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
 		}
+	}
+	return true, ""
+}
+
+func IsBuilderReady(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+	status := item.Object["status"].(map[string]interface{})
+	if _, found := status["conditions"]; !found {
+		return false, "⏳ waiting to become ready"
+	}
+	conditions := status["conditions"].([]interface{})
+	if len(conditions) == 0 {
+		return false, "⏳ waiting to become ready"
+	}
+	for _, raw := range conditions {
+		condition := raw.(map[string]interface{})
+		if condition["type"] != "Ready" && condition["status"] != "True" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+		}
+	}
+	if status["latestImage"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+	image := status["latestImage"].(string)
+	if len(image) == 0 {
+		return false, "⏳ waiting to become ready"
+	}
+	return true, ""
+}
+
+func IsImageReady(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+	status := item.Object["status"].(map[string]interface{})
+	if _, found := status["conditions"]; !found {
+		return false, "⏳ waiting to become ready"
+	}
+	if status["latestImage"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+	image := status["latestImage"].(string)
+	if len(image) == 0 {
+		return false, "⏳ waiting to become ready"
 	}
 	return true, ""
 }
