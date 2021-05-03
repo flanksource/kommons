@@ -7,7 +7,7 @@ import (
 )
 
 type StructTemplater struct {
-	Values map[string]string
+	Values    map[string]string
 	Clientset *kubernetes.Clientset
 	functions *Functions
 }
@@ -32,7 +32,7 @@ func (w StructTemplater) Template(val string) string {
 			return env
 		}
 	} else if w.Clientset != nil {
-		if w.functions == nil{
+		if w.functions == nil {
 			w.functions = NewFunctions(w.Clientset)
 		}
 		parse, err := w.functions.Template(val, w.Values)
