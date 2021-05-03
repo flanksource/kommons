@@ -45,8 +45,8 @@ type EnvVar struct {
 
 // +kubebuilder:object:generate=true
 type EnvVarSource struct {
-	ConfigMapKeyRef  *ConfigMapKeySelector  `json:"configMapKeyRef,omitempty" yaml:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
-	SecretKeyRef     *SecretKeySelector     `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" yaml:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
+	SecretKeyRef    *SecretKeySelector    `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
 }
 
 // +kubebuilder:object:generate=true
@@ -67,4 +67,3 @@ type SecretKeySelector struct {
 type LocalObjectReference struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
-
