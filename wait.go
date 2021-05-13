@@ -220,6 +220,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return c.IsConstraintTemplateReady(item)
 	case IsMongoDB(item):
 		return c.IsMongoDBReady(item)
+	case IsKafka(item):
+		return c.IsConditionReadyTrue(item)
 	case IsBuilder(item):
 		return IsBuilderReady(item)
 	case IsImage(item):
@@ -329,6 +331,29 @@ func (c *Client) IsMongoDBReady(item *unstructured.Unstructured) (bool, string) 
 	}
 
 	return true, ""
+}
+
+func (c *Client) IsConditionReadyTrue(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	status := item.Object["status"].(map[string]interface{})
+	if _, found := status["conditions"]; !found {
+		return false, "⏳ waiting to become ready"
+	}
+
+	conditions := status["conditions"].([]interface{})
+	if len(conditions) == 0 {
+		return false, "⏳ waiting to become ready"
+	}
+	for _, raw := range conditions {
+		condition := raw.(map[string]interface{})
+		if condition["type"] == "Ready" && condition["status"] == "True" {
+			return true, ""
+		}
+	}
+	return false, "⏳ waiting to become ready"
 }
 
 func (c *Client) IsElasticsearchReady(item *unstructured.Unstructured) (bool, string) {
