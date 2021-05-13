@@ -187,6 +187,32 @@ func IsAppReady(item *unstructured.Unstructured) (bool, string) {
 	return false, fmt.Sprintf("⏳ waiting for replicas to become ready %v/%v", status["readyReplicas"], status["replicas"])
 }
 
+func IsServiceReady(item *unstructured.Unstructured, client *Client) (bool, string) {
+	serviceType := item.Object["spec"].(map[string]interface{})["type"]
+	if serviceType == "LoadBalancer" {
+		ingress, found, _ := unstructured.NestedSlice(item.Object, "status", "loadBalancer", "ingress")
+		if !found || len(ingress) == 0 {
+			return false, "⏳ waiting for LoadBalancerIP"
+		}
+		return true, ""
+	} else {
+		item, _ := client.GetByKind("Endpoints", item.GetNamespace(), item.GetName())
+		if item == nil {
+			return false, "⏳ waiting for the corresponding Endpoint"
+		}
+		return true, ""
+	}
+}
+
+func IsDataContainerReady(item *unstructured.Unstructured) (bool, string) {
+	data, found, _ := unstructured.NestedMap(item.Object, "data")
+	if found && len(data) > 0 {
+		return true, ""
+	} else {
+		return false, "⏳ waiting for data"
+	}
+}
+
 func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	if c.ApplyDryRun {
 		return true, ""
@@ -197,13 +223,10 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	c.Debugf("[%s] checking readiness", GetName(item))
 
 	switch {
-	case IsSecret(item):
-		data, found, _ := unstructured.NestedMap(item.Object, "data")
-		if found && len(data) > 0 {
-			return true, ""
-		} else {
-			return false, "⏳ waiting for data"
-		}
+	case IsSecret(item) || IsConfigMap(item):
+		return IsDataContainerReady(item)
+	case IsService(item):
+		return IsServiceReady(item, c)
 	case IsApp(item):
 		return IsAppReady(item)
 	case IsElasticsearch(item):
