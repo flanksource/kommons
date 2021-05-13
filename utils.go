@@ -402,6 +402,10 @@ func IsMongoDB(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "PerconaServerMongoDB"
 }
 
+func IsKafka(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Kafka"
+}
+
 func IsBuilder(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Builder"
 }
