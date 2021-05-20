@@ -225,6 +225,13 @@ func (c *Client) GetRESTConfigInCluster() (*rest.Config, error) {
 	return data, nil
 }
 
+// Remove the reference to the existing RestMapper, forcing a recreation next time GetRestMapper is called
+// Use when it is known that the existing discovery cache is stale to avoid having to wait for the 10 minute timeout
+func (c *Client) ResetRestMapper() error {
+	c.restMapper = nil
+	return nil
+}
+
 func (c *Client) GetRestMapper() (meta.RESTMapper, error) {
 	if c.restMapper != nil {
 		return c.restMapper, nil
