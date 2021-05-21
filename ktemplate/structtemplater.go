@@ -1,14 +1,14 @@
 package ktemplate
 
 import (
-	"github.com/flanksource/kommons"
+	"k8s.io/client-go/kubernetes"
 	"reflect"
 	"strings"
 )
 
 type StructTemplater struct {
 	Values    map[string]string
-	Clientset *kommons.Client
+	Clientset *kubernetes.Clientset
 	functions *Functions
 }
 

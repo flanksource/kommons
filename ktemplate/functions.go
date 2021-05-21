@@ -1,17 +1,17 @@
 package ktemplate
 
 import (
-	"github.com/flanksource/kommons"
 	"text/template"
 
 	gomplate "github.com/hairyhenderson/gomplate/v3"
+	"k8s.io/client-go/kubernetes"
 )
 
 type Functions struct {
-	clientset *kommons.Client
+	clientset *kubernetes.Clientset
 }
 
-func NewFunctions(clientset *kommons.Client) *Functions {
+func NewFunctions(clientset *kubernetes.Clientset) *Functions {
 	return &Functions{clientset: clientset}
 }
 
