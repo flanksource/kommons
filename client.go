@@ -144,13 +144,20 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 		name      string
 	)
 	for _, patch := range patches {
-		if files.Exists(patch) {
-			name = filepath.Base(patch)
-			patchBytes, err := ioutil.ReadFile(patch)
-			if err != nil {
-				return nil, err
+		if files.IsValidPathType(patch, "yaml", "yml", "json") {
+			if files.Exists(patch) {
+				name, err = filepath.Abs(patch)
+				if err != nil {
+					return nil, err
+				}
+				patchBytes, err := ioutil.ReadFile(patch)
+				if err != nil {
+					return nil, err
+				}
+				patchData = &patchBytes
+			} else {
+				return nil, errors.New(fmt.Sprintf("file %v not found", patch))
 			}
-			patchData = &patchBytes
 		} else {
 			patchBytes := []byte(patch)
 			patchData = &patchBytes
