@@ -29,20 +29,22 @@ func InstallTestBin(version string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	//etcd, kube-apiserver and kubectl are all packaged in the same zip.  Only one install call is needed to install all three
+	// DO NOT call kubectl, as that will install the standalone bin, not the test package
 	if err = deps.InstallDependency("etcd", version, dir); err != nil {
 		return "", err
 	}
 	return dir, nil
 }
 
-func StartTestEnv(version string) (*rest.Config, error) {
+func StartTestEnv(version string) (*rest.Config, string, error) {
 	bindir, err := InstallTestBin(version)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	var APIpath = strings.Join([]string{bindir,"kube-apiserver"}, "/")
-	var ETCpath = strings.Join([]string{bindir,"etcd"}, "/")
-	var Kpath =  strings.Join([]string{bindir,"kubectl"}, "/")
+	var APIpath = strings.Join([]string{bindir, "kube-apiserver"}, "/")
+	var ETCpath = strings.Join([]string{bindir, "etcd"}, "/")
+	var Kpath = strings.Join([]string{bindir, "kubectl"}, "/")
 
 	os.Setenv("TEST_ASSET_KUBE_APISERVER", APIpath)
 	os.Setenv("TEST_ASSET_ETCD", ETCpath)
@@ -54,6 +56,9 @@ func StartTestEnv(version string) (*rest.Config, error) {
 		CRDDirectoryPaths:  []string{filepath.Join("..", "config", "crd", "bases")},
 		KubeAPIServerFlags: APIServerDefaultArgs,
 	}
-
-	return testEnv.Start()
+	config, err := testEnv.Start()
+	if err != nil {
+		return nil, "", err
+	}
+	return config, bindir, nil
 }
