@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/AlekSi/pointer v1.1.0
-	github.com/flanksource/commons v1.5.1
+	github.com/flanksource/commons v1.5.6
 	github.com/hairyhenderson/gomplate/v3 v3.6.0
 	github.com/mitchellh/mapstructure v1.3.3
 	github.com/pkg/errors v0.9.1
