@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/AlekSi/pointer v1.1.0
-	github.com/flanksource/commons v1.5.1
+	github.com/flanksource/commons v1.5.6
 	github.com/hairyhenderson/gomplate/v3 v3.6.0
 	github.com/mitchellh/mapstructure v1.3.3
 	github.com/pkg/errors v0.9.1
@@ -20,6 +20,7 @@ require (
 	k8s.io/cli-runtime v0.20.4
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
+	sigs.k8s.io/controller-runtime v0.8.3
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
 )
