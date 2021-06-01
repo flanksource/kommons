@@ -105,6 +105,9 @@ func TestPod(testName string, client kubernetes.Interface, events typedv1.EventI
 			}
 			msg += fmt.Sprintf("%s: %s ", event.Reason, event.Message)
 		}
+		if pod.Spec.NodeName == "" {
+			msg += fmt.Sprintf("nodeName=<blank>: pod not scheduled yet ")
+		}
 		return goerrors.New(fmt.Sprintf("%s/%s=%s %s ", pod.Namespace, pod.Name, pod.Status.Phase, msg))
 	}
 
