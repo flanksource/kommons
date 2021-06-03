@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	osruntime "runtime"
 	"strings"
 	"sync"
@@ -281,8 +282,8 @@ func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]run
 
 func GetUnstructuredObjects(data []byte) ([]runtime.Object, error) {
 	var items []runtime.Object
-
-	for _, chunk := range strings.Split(string(data), "---\n") {
+	re := regexp.MustCompile("(?m)^---\\n")
+	for _, chunk := range re.Split(string(data), -1) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
