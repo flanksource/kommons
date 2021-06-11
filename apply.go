@@ -3,6 +3,7 @@ package kommons
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -127,6 +128,10 @@ func RequiresReplacement(obj *unstructured.Unstructured, err error) bool {
 		return true
 	}
 	return false
+}
+
+func RequiresRetry(err error) bool {
+	return strings.Contains(fmt.Sprintf("%v", err), "please apply your changes to the latest version and try again")
 }
 
 func IsDiffable(obj *unstructured.Unstructured) bool {
@@ -269,18 +274,32 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			c.Debugf("%s %s%s", GetName(unstructuredObj), skipping, extra)
 		} else {
 			newObject := unstructuredObj.DeepCopy()
-			updated, err := client.Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
-			if err != nil {
-				if !RequiresReplacement(unstructuredObj, err) {
-					return err
-				}
-				c.Infof("error updating: %s, attempting replacement", GetName(unstructuredObj))
-				if err := client.Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{}); err != nil {
-					return perrors.Wrapf(err, "failed to delete %s, during replacement", GetName(unstructuredObj))
-				}
+			var updated *unstructured.Unstructured
+			retryCount := 0
+			rand.Seed(time.Now().UnixNano())
+			for {
+				updated, err = client.Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
+				if err != nil {
+					if RequiresReplacement(unstructuredObj, err) {
+						c.Infof("error updating: %s, attempting replacement", GetName(unstructuredObj))
+						if err := client.Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{}); err != nil {
+							return perrors.Wrapf(err, "failed to delete %s, during replacement", GetName(unstructuredObj))
+						}
 
-				if updated, err = client.Create(context.TODO(), StripIdentifiers(newObject), metav1.CreateOptions{}); err != nil {
-					return perrors.Wrapf(err, "failed to recreate %s, during replacement, neither the new or old object remain", GetName(unstructuredObj))
+						if updated, err = client.Create(context.TODO(), StripIdentifiers(newObject), metav1.CreateOptions{}); err != nil {
+							return perrors.Wrapf(err, "failed to recreate %s, during replacement, neither the new or old object remain", GetName(unstructuredObj))
+						}
+					} else if RequiresRetry(err) {
+						if retryCount >= 3 {
+							return perrors.Wrap(err, "updating failed after 3 attempts")
+						}
+						backoff := rand.Intn(5000)
+						c.Infof("potential race condition detected, retrying in %s milliseconds", backoff)
+						time.Sleep(time.Millisecond * time.Duration(backoff))
+						retryCount = retryCount + 1
+					}
+				} else {
+					break
 				}
 			}
 
