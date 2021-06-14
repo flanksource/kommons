@@ -291,7 +291,7 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 						}
 					} else if RequiresRetry(err) {
 						if retryCount >= 3 {
-							return perrors.Wrap(err, "updating failed after 3 attempts")
+							return err
 						}
 						backoff := rand.Intn(5000)
 						c.Infof("potential race condition detected, retrying in %s milliseconds", backoff)
