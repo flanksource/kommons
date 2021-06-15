@@ -119,7 +119,7 @@ func (c *Client) DeleteUnstructured(namespace string, objects ...*unstructured.U
 }
 
 func RequiresReplacement(obj *unstructured.Unstructured, err error) bool {
-	if IsDeployment(obj) || IsDaemonSet(obj) &&
+	if (IsDeployment(obj) || IsDaemonSet(obj)) &&
 		strings.Contains(fmt.Sprintf("%+v", err), "field is immutable") {
 		return true
 	} else if IsAnyRoleBinding(obj) &&
