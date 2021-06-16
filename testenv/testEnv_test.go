@@ -1,13 +1,14 @@
-package kommons
+package testenv
 
 import (
 	"context"
-	"github.com/flanksource/commons/files"
-	"github.com/flanksource/commons/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/flanksource/commons/files"
+	"github.com/flanksource/commons/logger"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstallTestBin(t *testing.T) {
