@@ -20,7 +20,6 @@ require (
 	k8s.io/cli-runtime v0.20.4
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
-	sigs.k8s.io/controller-runtime v0.8.3
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
 )
