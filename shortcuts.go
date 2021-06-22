@@ -9,13 +9,12 @@ import (
 	"github.com/mitchellh/mapstructure"
 	perrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (c *Client) CreateOrUpdateConfigMap(name, ns string, data map[string]string) error {
@@ -99,31 +98,33 @@ func (c *Client) ExposeIngress(namespace, service string, domain string, port in
 	if err != nil {
 		return fmt.Errorf("exposeIngress: failed to get client set: %v", err)
 	}
-	ingresses := k8s.NetworkingV1beta1().Ingresses(namespace)
+	ingresses := k8s.NetworkingV1().Ingresses(namespace)
 	ingress, err := ingresses.Get(context.TODO(), service, metav1.GetOptions{})
 	if ingress == nil || err != nil {
-		ingress = &v1beta1.Ingress{
+		ingress = &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        service,
 				Namespace:   namespace,
 				Annotations: annotations,
 			},
-			Spec: v1beta1.IngressSpec{
-				TLS: []v1beta1.IngressTLS{
+			Spec: networkingv1.IngressSpec{
+				TLS: []networkingv1.IngressTLS{
 					{
 						Hosts: []string{domain},
 					},
 				},
-				Rules: []v1beta1.IngressRule{
+				Rules: []networkingv1.IngressRule{
 					{
 						Host: domain,
-						IngressRuleValue: v1beta1.IngressRuleValue{
-							HTTP: &v1beta1.HTTPIngressRuleValue{
-								Paths: []v1beta1.HTTPIngressPath{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{
 									{
-										Backend: v1beta1.IngressBackend{
-											ServiceName: service,
-											ServicePort: intstr.FromInt(port),
+										Backend: networkingv1.IngressBackend{
+											Service: &networkingv1.IngressServiceBackend{
+												Name: service,
+												Port: networkingv1.ServiceBackendPort{Number: int32(port)},
+											},
 										},
 									},
 								},
