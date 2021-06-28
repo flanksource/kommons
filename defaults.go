@@ -4,7 +4,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -14,27 +13,6 @@ import (
 )
 
 var defaulter = runtime.NewScheme()
-
-func DefaultsIngress(ing *networking.Ingress) *networking.Ingress {
-	defaulter.Default(ing)
-	implementationSpecific := networking.PathTypeImplementationSpecific
-	_rules := []networking.IngressRule{}
-	for _, rule := range ing.Spec.Rules {
-		if rule.HTTP != nil {
-			_paths := []networking.HTTPIngressPath{}
-			for _, path := range rule.HTTP.Paths {
-				if path.PathType == nil {
-					path.PathType = &implementationSpecific
-				}
-				_paths = append(_paths, path)
-			}
-			rule.HTTP.Paths = _paths
-		}
-		_rules = append(_rules, rule)
-	}
-	ing.Spec.Rules = _rules
-	return ing
-}
 
 func DefaultsService(svc *v1.Service) *v1.Service {
 	defaulter.Default(svc)
@@ -355,13 +333,6 @@ func Defaults(obj *unstructured.Unstructured) (*unstructured.Unstructured, error
 			return nil, err
 		}
 		return ToUnstructured(obj, DefaultsClusterRoleBinding(rb))
-	} else if IsIngress(obj) {
-		ing, err := AsIngress(obj)
-		if err != nil {
-			return nil, err
-		}
-		return ToUnstructured(obj, DefaultsIngress(ing))
-
 	}
 
 	return obj, nil
