@@ -26,6 +26,10 @@ var (
 	diff       = diffmatchpatch.New()
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 type ApplyHook func(namespace string, obj unstructured.Unstructured)
 
 func (c *Client) copyImmutable(from, to *unstructured.Unstructured) {
@@ -276,7 +280,6 @@ func (c *Client) Apply(namespace string, objects ...runtime.Object) error {
 			newObject := unstructuredObj.DeepCopy()
 			var updated *unstructured.Unstructured
 			retryCount := 0
-			rand.Seed(time.Now().UnixNano())
 			for {
 				updated, err = client.Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
 				if err != nil {
