@@ -2,6 +2,7 @@ package kommons
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -660,6 +661,14 @@ func GetUnstructuredObjects(data []byte) ([]*unstructured.Unstructured, error) {
 		if resource != nil {
 			items = append(items, resource)
 		}
+	}
+	return items, nil
+}
+
+func GetUnstructuredObjectsFromJson(data []byte) ([]*unstructured.Unstructured, error) {
+	var items []*unstructured.Unstructured
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
