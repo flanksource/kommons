@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -647,7 +648,8 @@ func (h Health) String() string {
 
 func GetUnstructuredObjects(data []byte) ([]*unstructured.Unstructured, error) {
 	var items []*unstructured.Unstructured
-	for _, chunk := range strings.Split(string(data), "---\n") {
+	re := regexp.MustCompile("(?m)^---\\n")
+	for _, chunk := range re.Split(string(data), -1) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
