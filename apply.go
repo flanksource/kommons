@@ -9,6 +9,7 @@ import (
 	"github.com/flanksource/commons/console"
 	perrors "github.com/pkg/errors"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -105,11 +106,15 @@ func (c *Client) DeleteUnstructured(namespace string, objects ...*unstructured.U
 		if err != nil {
 			return err
 		}
+		_namespace := namespace
+		if _namespace == v1.NamespaceAll {
+			_namespace = unstructuredObj.GetNamespace()
+		}
 
 		if c.ApplyDryRun {
 			c.Infof("[dry-run] %s %s", GetName(unstructuredObj), deleted)
 		} else {
-			if _, err := client.Delete(namespace, unstructuredObj.GetName()); err != nil {
+			if _, err := client.Delete(_namespace, unstructuredObj.GetName()); err != nil {
 				return err
 			}
 			c.Infof("%s %s", GetName(unstructuredObj), deleted)
