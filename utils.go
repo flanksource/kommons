@@ -700,6 +700,45 @@ func RemoveTaint(taints []v1.Taint, name string) []v1.Taint {
 	return list
 }
 
+var regexpNonAuthorizedChars = regexp.MustCompile("[^a-zA-Z0-9-.]")
+var regexpMultipleDashes = regexp.MustCompile("-+")
+var dns1192MaxLength = 40
+
+// GetDNS1192Name trasforms  a name into a DNS-1192 compliant name
+func GetDNS1192Name(s string) string {
+	// Adapted from:
+	// Copyright 2013 by Dobrosław Żybort. All rights reserved.
+	// This Source Code Form is subject to the terms of the Mozilla Public
+	// License, v. 2.0. If a copy of the MPL was not distributed with this
+	// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+	slug := strings.TrimSpace(s)
+	slug = strings.ToLower(slug)
+
+	// Process all remaining symbols
+	slug = regexpNonAuthorizedChars.ReplaceAllString(slug, "-")
+	slug = regexpMultipleDashes.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-_")
+	if len(slug) > dns1192MaxLength {
+		var truncated string
+		words := strings.SplitAfter(slug, "-")
+		// If MaxLength is smaller than length of the first word return word
+		// truncated after MaxLength.
+		if len(words[0]) > dns1192MaxLength {
+			return words[0][:dns1192MaxLength]
+		}
+		for _, word := range words {
+			if len(truncated)+len(word)-1 <= dns1192MaxLength {
+				truncated = truncated + word
+			} else {
+				break
+			}
+		}
+		return strings.Trim(truncated, "-")
+	}
+	return slug
+}
+
 func HasTaint(node v1.Node, name string) bool {
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == name {
