@@ -583,10 +583,6 @@ func (c *Client) WaitForPod(ns, name string, timeout time.Duration, phases ...v1
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if pod.Status.Phase == v1.PodFailed {
-			return nil
-		}
-
 		for _, phase := range phases {
 			if pod.Status.Phase == phase {
 				return nil
