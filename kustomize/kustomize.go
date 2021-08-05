@@ -17,19 +17,18 @@ package kustomize
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
-	"regexp"
-	osruntime "runtime"
-	"strings"
-	"sync"
-
+	"github.com/TomOnTime/utfutil"
+	"github.com/flanksource/commons/logger"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/kustomize"
+	"path/filepath"
+	"regexp"
+	osruntime "runtime"
 	"sigs.k8s.io/kustomize/pkg/constants"
 	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/ifc"
@@ -37,6 +36,8 @@ import (
 	"sigs.k8s.io/kustomize/pkg/patch"
 	"sigs.k8s.io/kustomize/pkg/types"
 	"sigs.k8s.io/yaml"
+	"strings"
+	"sync"
 )
 
 // Manager define a manager that allow access to kustomize capabilities
@@ -281,9 +282,13 @@ func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]run
 }
 
 func GetUnstructuredObjects(data []byte) ([]runtime.Object, error) {
+	utfData, err := BytesToUtf8Lf(data)
+	if  err  != nil  {
+		return nil, fmt.Errorf("error converting to UTF %s",  err)
+	}
 	var items []runtime.Object
 	re := regexp.MustCompile("(?m)^---\\n")
-	for _, chunk := range re.Split(string(data), -1) {
+	for _, chunk := range re.Split(utfData, -1) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
@@ -300,3 +305,20 @@ func GetUnstructuredObjects(data []byte) ([]runtime.Object, error) {
 
 	return items, nil
 }
+
+func BytesToUtf8Lf(file []byte) (string, error) {
+	decoded := utfutil.BytesReader(file, utfutil.UTF8)
+	buf := new(bytes.Buffer)
+	bytesRead, err := buf.ReadFrom(decoded)
+	if err != nil {
+		logger.Errorf("error reading from buffer. bytesRead %v. err: %v", bytesRead, err)
+		return "", err
+	}
+	val := buf.Bytes()
+	// replace \r with \n -> solves for Mac but leaves \n\n for Windows
+	val = bytes.Replace(val, []byte{13}, []byte{10}, -1)
+	// replace \n\n with \n
+	val = bytes.Replace(val, []byte{10, 10}, []byte{10}, -1)
+	return string(val), nil
+}
+
