@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - main
 jobs:
   semantic-release:
     runs-on: ubuntu-20.04

@@ -1,0 +1,29 @@
+#This test file must be in UTF-8 with LF endings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spring-defaults-spring
+  namespace: default
+data:
+  logging.level.org.springframework.web: INFO
+  logging.level.org.springframework: DEBUG
+  some-key: "value-from-spring"
+---
+apiVersion: v1
+data:
+  application.properties: |
+    some-key=new-value
+    new-key=diff-value
+kind: ConfigMap
+metadata:
+  name: sample
+  namespace: default
+---
+apiVersion: v1
+data:
+  secret-key: c29tZS12YWx1ZQ==
+kind: Secret
+metadata:
+  name: test
+  namespace: default
+type: Opaque

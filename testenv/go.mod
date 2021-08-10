@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/flanksource/commons v1.5.6
+	github.com/flanksource/kommons v0.21.1
 	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v11.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.8.3

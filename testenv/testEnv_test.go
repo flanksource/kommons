@@ -2,13 +2,13 @@ package testenv
 
 import (
 	"context"
+	"github.com/flanksource/commons/files"
+	"github.com/flanksource/commons/logger"
+	"github.com/flanksource/kommons"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/flanksource/commons/files"
-	"github.com/flanksource/commons/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstallTestBin(t *testing.T) {
@@ -75,7 +75,7 @@ func TestStartTestEnv(t *testing.T) {
 				return
 			}
 			t.Logf("connecting to kube-apiserver at %v/%v", got.Host, got.APIPath)
-			cfg := NewClient(got, logger.GetZapLogger())
+			cfg := kommons.NewClient(got, logger.GetZapLogger())
 			client, err := cfg.GetClientset()
 			if err != nil || client == nil {
 				t.Errorf("Could not create k8s client from rest config: %v", err)
