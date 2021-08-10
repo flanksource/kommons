@@ -17,7 +17,6 @@ import (
 	"testing"
 )
 
-
 type UTFWriteCloser interface {
 	Write(p []byte) (n int, err error)
 	Close() error
@@ -68,13 +67,13 @@ func bytesWriter(b *bytes.Buffer, d utfutil.EncodingHint) io.Writer {
 
 func bytesToCrlfOrCr(file []byte, os string, hint utfutil.EncodingHint) (string, error) {
 	val := file
-	val = bytes.Replace(val, []byte{13}, []byte{10}, -1)
-	val = bytes.Replace(val, []byte{10, 10}, []byte{10}, -1)
+	val = bytes.ReplaceAll(val, []byte{13}, []byte{10})
+	val = bytes.ReplaceAll(val, []byte{10, 10}, []byte{10})
 	switch os {
 	case "macos":
-		val = bytes.Replace(val, []byte{10}, []byte{13}, -1)
+		val = bytes.ReplaceAll(val, []byte{10}, []byte{13})
 	default:
-		val = bytes.Replace(val, []byte{10}, []byte{13, 10}, -1)
+		val = bytes.ReplaceAll(val, []byte{10}, []byte{13, 10})
 	}
 	var buf bytes.Buffer
 	writer := bytesWriter(&buf, hint)
@@ -101,7 +100,6 @@ func getFileBuffer(filePath string) ([]byte, error) {
 	return buf, nil
 }
 
-
 func TestBytesToUtf8Lf(t *testing.T) {
 
 	// If tests are breaking, first check that the file read is UTF-8 with LF endings
@@ -121,7 +119,7 @@ func TestBytesToUtf8Lf(t *testing.T) {
 		t.Errorf("error setting up test TestBytesToUtf8Lf: %v", err)
 		return
 	}
-	utf16BeCrMac, err := bytesToCrlfOrCr(data,  "macos", utfutil.UTF16BE)
+	utf16BeCrMac, err := bytesToCrlfOrCr(data, "macos", utfutil.UTF16BE)
 	if err != nil {
 		t.Errorf("error setting up test TestBytesToUtf8Lf: %v", err)
 		return
@@ -204,13 +202,13 @@ func TestGetUnstructuredObjects(t *testing.T) {
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"data": map[string]interface{}{
-				"logging.level.org.springframework": "DEBUG",
+				"logging.level.org.springframework":     "DEBUG",
 				"logging.level.org.springframework.web": "INFO",
-				"some-key": "value-from-spring",
+				"some-key":                              "value-from-spring",
 			},
 			"kind": "ConfigMap",
 			"metadata": map[string]interface{}{
-				"name": "spring-defaults-spring",
+				"name":      "spring-defaults-spring",
 				"namespace": "default",
 			},
 		},
@@ -220,12 +218,12 @@ func TestGetUnstructuredObjects(t *testing.T) {
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"data": map[string]interface{}{
-				"application.properties":  "some-key=new-value\nnew-key=diff-value\n",
+				"application.properties": "some-key=new-value\nnew-key=diff-value\n",
 			},
 			"kind": "ConfigMap",
 			"metadata": map[string]interface{}{
-			"name": "sample",
-			"namespace": "default",
+				"name":      "sample",
+				"namespace": "default",
 			},
 		},
 	}
@@ -246,7 +244,7 @@ func TestGetUnstructuredObjects(t *testing.T) {
 		t.Errorf("error setting up test TestBytesToUtf8Lf: %v", err)
 		return
 	}
-	utf16BeCrMac, err := bytesToCrlfOrCr(data,  "macos", utfutil.UTF16BE)
+	utf16BeCrMac, err := bytesToCrlfOrCr(data, "macos", utfutil.UTF16BE)
 	if err != nil {
 		t.Errorf("error setting up test TestBytesToUtf8Lf: %v", err)
 		return
@@ -257,61 +255,61 @@ func TestGetUnstructuredObjects(t *testing.T) {
 		return
 	}
 
-	items := []runtime.Object{ itemOne, itemTwo }
+	items := []runtime.Object{itemOne, itemTwo}
 	type args struct {
 		data []byte
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []runtime.Object
+		name        string
+		args        args
+		want        []runtime.Object
 		testIndexes []int
-		wantErr bool
+		wantErr     bool
 	}{
 		{
 			name: "f(data)->[]runtime.Object{ ...items }",
 			args: args{
 				data: data,
 			},
-			want:    items,
+			want:        items,
 			testIndexes: []int{0, 1},
-			wantErr: false,
+			wantErr:     false,
 		},
 		{
 			name: "f(utf16LeCrMac)->[]runtime.Object{ ...items }",
 			args: args{
 				data: []byte(utf16LeCrMac),
 			},
-			want:    items,
+			want:        items,
 			testIndexes: []int{0, 1},
-			wantErr: false,
+			wantErr:     false,
 		},
 		{
 			name: "f(utf16BeCrMac)->[]runtime.Object{ ...items }",
 			args: args{
 				data: []byte(utf16BeCrMac),
 			},
-			want:    items,
+			want:        items,
 			testIndexes: []int{0, 1},
-			wantErr: false,
+			wantErr:     false,
 		},
 		{
 			name: "f(utf16LeCrlfDefault)->[]runtime.Object{ ...items }",
 			args: args{
 				data: []byte(utf16LeCrlfDefault),
 			},
-			want:    items,
+			want:        items,
 			testIndexes: []int{0, 1},
-			wantErr: false,
+			wantErr:     false,
 		},
 		{
 			name: "f(utf16BeCrlfDefault)->[]runtime.Object{ ...items }",
 			args: args{
 				data: []byte(utf16BeCrlfDefault),
 			},
-			want:    items,
+			want:        items,
 			testIndexes: []int{0, 1},
-			wantErr: false,
+			wantErr:     false,
 		},
 	}
 	for _, tt := range tests {

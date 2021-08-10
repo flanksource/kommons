@@ -29,3 +29,7 @@ endif
 .PHONY: test
 test:
 	go test   ./... -test.v
+
+.PHONY: fmt
+fmt:
+	go fmt ./...
