@@ -8,6 +8,7 @@ require (
 	github.com/flanksource/commons v1.5.6
 	github.com/hairyhenderson/gomplate/v3 v3.6.0
 	github.com/mitchellh/mapstructure v1.3.3
+	github.com/mitchellh/reflectwalk v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.0.0
 	github.com/sirupsen/logrus v1.7.0

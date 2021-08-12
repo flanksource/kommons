@@ -1,6 +1,7 @@
 package ktemplate
 
 import (
+	"github.com/mitchellh/reflectwalk"
 	"k8s.io/client-go/kubernetes"
 	"reflect"
 	"strings"
@@ -10,6 +11,8 @@ type StructTemplater struct {
 	Values    map[string]string
 	Clientset *kubernetes.Clientset
 	functions *Functions
+	// IgnoreFields from walking where key is field name and value is field type
+	IgnoreFields map[string]string
 }
 
 // this func is required to fulfil the reflectwalk.StructWalker interface
@@ -18,6 +21,11 @@ func (w StructTemplater) Struct(reflect.Value) error {
 }
 
 func (w StructTemplater) StructField(f reflect.StructField, v reflect.Value) error {
+	for key, value := range w.IgnoreFields {
+		if key == f.Name && value == f.Type.String() {
+			return reflectwalk.SkipEntry
+		}
+	}
 	if v.CanSet() && v.Kind() == reflect.String {
 		v.SetString(w.Template(v.String()))
 	}
