@@ -19,5 +19,6 @@ func (f *Functions) FuncMap() template.FuncMap {
 	fm := gomplate.Funcs(nil)
 	fm["kget"] = f.KGet
 	fm["jsonPath"] = f.JSONPath
+	fm["parseMarkdownTables"] = f.ParseMarkdownTables
 	return fm
 }
