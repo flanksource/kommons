@@ -81,7 +81,7 @@ API | Description | Auth | HTTPS | CORS |
 			t.Errorf("invalid table rows length for table 1: %v", len(table1.Rows))
 			return
 		}
-		if !reflect.DeepEqual(table1.Rows[5], []string{"https://dukengn.github.io/Dog-facts-API/", "Random doag facts", "No", "Yes", "Unknown"}) {
+		if !reflect.DeepEqual(table1.Rows[5], []string{"https://dukengn.github.io/Dog-facts-API/", "Random dog facts", "No", "Yes", "Unknown"}) {
 			t.Errorf("invalid table row 6: %v", table1.Rows[5])
 		}
 	})
