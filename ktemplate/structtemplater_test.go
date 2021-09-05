@@ -51,9 +51,10 @@ var tests = []test{
 			Values: map[string]string{
 				"msg": "world",
 			},
+			ValueFunctions: true,
 		},
 		Input: &Test{
-			Template: "hello $(world)",
+			Template: "hello $(msg)",
 		},
 		Output: &Test{
 			Template: "hello world",

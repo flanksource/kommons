@@ -17,7 +17,9 @@ type StructTemplater struct {
 	IgnoreFields map[string]string
 	Funcs        template.FuncMap
 	DelimSets    []Delims
-	RequiredTag  string
+	// If specified create a function for each value so that is can be accessed via {{ value }} in addition to {{ .value }}
+	ValueFunctions bool
+	RequiredTag    string
 }
 
 type Delims struct {
@@ -59,6 +61,18 @@ func (w StructTemplater) Template(val string) (string, error) {
 	if w.functions == nil {
 		w.functions = NewFunctions(w.Clientset)
 		w.functions.Custom = w.Funcs
+
+		if w.ValueFunctions {
+			if w.functions.Custom == nil {
+				w.functions.Custom = make(template.FuncMap)
+			}
+			for k, v := range w.Values {
+				_v := v
+				w.functions.Custom[k] = func() string {
+					return _v
+				}
+			}
+		}
 	}
 	if len(w.DelimSets) == 0 {
 		w.DelimSets = []Delims{{Left: "{{", Right: "}}"}}
