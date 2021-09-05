@@ -8,7 +8,9 @@ import (
 )
 
 type Functions struct {
-	clientset *kubernetes.Clientset
+	clientset             *kubernetes.Clientset
+	RightDelim, LeftDelim string
+	Custom                template.FuncMap
 }
 
 func NewFunctions(clientset *kubernetes.Clientset) *Functions {
@@ -20,5 +22,8 @@ func (f *Functions) FuncMap() template.FuncMap {
 	fm["kget"] = f.KGet
 	fm["jsonPath"] = f.JSONPath
 	fm["parseMarkdownTables"] = f.ParseMarkdownTables
+	for k, v := range f.Custom {
+		fm[k] = v
+	}
 	return fm
 }
