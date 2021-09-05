@@ -11,7 +11,13 @@ import (
 
 // Template templates out a template using gomplate
 func (f *Functions) Template(template string, vars interface{}) (string, error) {
+	if strings.TrimSpace(template) == "" {
+		return "", nil
+	}
 	tpl := gotemplate.New("")
+	if f.LeftDelim != "" {
+		tpl = tpl.Delims(f.LeftDelim, f.RightDelim)
+	}
 
 	tpl, err := tpl.Funcs(f.FuncMap()).Parse(template)
 

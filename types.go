@@ -43,6 +43,10 @@ type EnvVar struct {
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
+func (e EnvVar) IsEmpty() bool {
+	return e.Value == "" && e.ValueFrom == nil
+}
+
 // +kubebuilder:object:generate=true
 type EnvVarSource struct {
 	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" yaml:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`

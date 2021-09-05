@@ -363,7 +363,7 @@ func (c *Client) GetEnvValue(input EnvVar, namespace string) (string, string, er
 			return input.Name, value, nil
 		}
 	}
-	return "", "", perrors.New("could not extract value from incomplete EnvVar")
+	return "", "", perrors.New("must specify either value or valueFrom")
 }
 
 func (c *Client) GetConditionsForNode(name string) (map[v1.NodeConditionType]v1.ConditionStatus, error) {
