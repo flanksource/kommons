@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -559,6 +560,50 @@ func (c *Client) WaitForPodByLabel(ns, label string, timeout time.Duration, phas
 
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func sliceContains(slice []string, element string) bool {
+	for _, i := range slice {
+		if i == element {
+			return true
+		}
+	}
+	return false
+}
+
+// WaitForContainerStart waits for the specified containers to be started (or any container if no names are specified) - returns an error if the timeout is exceeded
+func (c *Client) WaitForContainerStart(ns, name string, timeout time.Duration, containerNames ...string) error {
+	if c.ApplyDryRun {
+		return nil
+	}
+	client, err := c.GetClientset()
+	if err != nil {
+		return fmt.Errorf("waitForPod: Failed to get clientset: %v", err)
+	}
+	pods := client.CoreV1().Pods(ns)
+	start := time.Now()
+	for {
+		pod, err := pods.Get(context.TODO(), name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			time.Sleep(1)
+			continue
+		} else {
+			return err
+		}
+		if start.Add(timeout).Before(time.Now()) {
+			return fmt.Errorf("timeout exceeded waiting for %s is %s, error: %v", name, pod.Status.Phase, err)
+		}
+		for _, container := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+			if len(containerNames) > 0 && !sliceContains(containerNames, container.Name) {
+				continue
+			}
+
+			if container.State.Running != nil || container.State.Terminated != nil {
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 // WaitForPod waits for a pod to be in the specified phase, or returns an
