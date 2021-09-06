@@ -3,12 +3,12 @@ package kommons
 import (
 	"bufio"
 	"bytes"
+	"container/list"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
-
 	"net"
 	"net/http"
 
@@ -520,7 +520,6 @@ func (c *Client) GetJobPod(namespace, jobName string) (string, error) {
 		}
 		time.Sleep(1 * time.Second)
 	}
-
 }
 
 func (c *Client) GetPodLogs(namespace, podName, container string) (string, error) {
@@ -544,6 +543,10 @@ func (c *Client) GetPodLogs(namespace, podName, container string) (string, error
 }
 
 func (c *Client) StreamLogs(namespace, name string) error {
+	return c.StreamLogsV2(namespace, name, 300*time.Second)
+}
+
+func (c *Client) StreamLogsV2(namespace, name string, timeout time.Duration, containerNames ...string) error {
 	client, err := c.GetClientset()
 	if err != nil {
 		return err
@@ -553,13 +556,22 @@ func (c *Client) StreamLogs(namespace, name string) error {
 	if err != nil {
 		return err
 	}
-	c.Debugf("Waiting for %s/%s to be running", namespace, name)
-	if err := c.WaitForPod(namespace, name, 120*time.Second, v1.PodRunning, v1.PodSucceeded); err != nil {
+	c.Tracef("Waiting for %s/%s to be running", namespace, name)
+	if err := c.WaitForContainerStart(namespace, name, 120*time.Second, containerNames...); err != nil {
 		return err
 	}
 	c.Debugf("%s/%s running, streaming logs", namespace, name)
 	var wg sync.WaitGroup
+	var containers = list.New()
+
 	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
+		if len(containerNames) == 0 || sliceContains(containerNames, container.Name) {
+			containers.PushBack(container)
+		}
+	}
+	// Loop over container list.
+	for element := containers.Front(); element != nil; element = element.Next() {
+		container := element.Value.(v1.Container)
 		logs := pods.GetLogs(pod.Name, &v1.PodLogOptions{
 			Container: container.Name,
 		})
@@ -570,7 +582,10 @@ func (c *Client) StreamLogs(namespace, name string) error {
 		}
 		podLogs, err := logs.Stream(context.TODO())
 		if err != nil {
-			return err
+			containers.PushBack(container)
+			logger.Tracef("failed to begin streaming %s/%s: %s", pod.Name, container.Name, err)
+			time.Sleep(500 * time.Millisecond)
+			continue
 		}
 		wg.Add(1)
 		go func() {
@@ -587,7 +602,7 @@ func (c *Client) StreamLogs(namespace, name string) error {
 		}()
 	}
 	wg.Wait()
-	if err = c.WaitForPod(namespace, name, 300*time.Second, v1.PodSucceeded); err != nil {
+	if err = c.WaitForPod(namespace, name, timeout, v1.PodSucceeded); err != nil {
 		return err
 	}
 	pod, err = pods.Get(context.TODO(), name, metav1.GetOptions{})
