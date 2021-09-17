@@ -145,16 +145,17 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 	)
 	for _, patch := range patches {
 		if files.Exists(patch) {
-			name = filepath.Base(patch)
+			name = fmt.Sprintf("%d-%s", no, filepath.Base(patch))
 			patchBytes, err := ioutil.ReadFile(patch)
 			if err != nil {
 				return nil, err
 			}
 			patchData = &patchBytes
+			no++
 		} else {
 			patchBytes := []byte(patch)
 			patchData = &patchBytes
-			name = fmt.Sprintf("patch-%d.yaml", no)
+			name = fmt.Sprintf("%d-patch.yaml", no)
 			no++
 		}
 		patchData, err = templatizePatch(patchData)
