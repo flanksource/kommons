@@ -34,9 +34,24 @@ func (c *Client) copyImmutable(from, to *unstructured.Unstructured) {
 	}
 	if IsService(to) {
 		spec := to.Object["spec"].(map[string]interface{})
-		spec["clusterIP"] = from.Object["spec"].(map[string]interface{})["clusterIP"]
-		spec["type"] = from.Object["spec"].(map[string]interface{})["type"]
-		spec["sessionAffinity"] = from.Object["spec"].(map[string]interface{})["sessionAffinity"]
+		fromSpec := from.Object["spec"].(map[string]interface{})
+		spec["clusterIP"] = fromSpec["clusterIP"]
+		spec["type"] = fromSpec["type"]
+		spec["sessionAffinity"] = fromSpec["sessionAffinity"]
+		if fromSpec["healthCheckNodePort"] != nil {
+			spec["healthCheckNodePort"] = fromSpec["healthCheckNodePort"]
+		}
+		spec["clusterIPs"] = fromSpec["clusterIPs"]
+
+		if fromSpec["type"] == "LoadBalancer" {
+			ports := spec["ports"].([]interface{})
+			fromPorts := fromSpec["ports"].([]interface{})
+			for i, port := range ports {
+				if fromPorts[i].(map[string]interface{})["nodePort"] != nil {
+					port.(map[string]interface{})["nodePort"] = fromPorts[i].(map[string]interface{})["nodePort"]
+				}
+			}
+		}
 
 	} else if IsServiceAccount(to) {
 		to.Object["secrets"] = from.Object["secrets"]
@@ -66,6 +81,7 @@ func (c *Client) copyImmutable(from, to *unstructured.Unstructured) {
 	to.SetUID(from.GetUID())
 	to.SetCreationTimestamp(from.GetCreationTimestamp())
 	to.SetGeneration(from.GetGeneration())
+	to.SetFinalizers(from.GetFinalizers())
 }
 
 // Sanitize will remove "runtime" fields from objects that woulds otherwise increase the verbosity of diffs
