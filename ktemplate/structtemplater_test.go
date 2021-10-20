@@ -29,7 +29,7 @@ var tests = []test{
 	{
 		StructTemplater: StructTemplater{
 			RequiredTag: "template",
-			Values: map[string]string{
+			Values: map[string]interface{}{
 				"msg": "world",
 			},
 		},
@@ -48,7 +48,7 @@ var tests = []test{
 				{Left: "{{", Right: "}}"},
 				{Left: "$(", Right: ")"},
 			},
-			Values: map[string]string{
+			Values: map[string]interface{}{
 				"msg": "world",
 			},
 			ValueFunctions: true,
