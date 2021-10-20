@@ -10,7 +10,7 @@ import (
 )
 
 type StructTemplater struct {
-	Values    map[string]string
+	Values    map[string]interface{}
 	Clientset *kubernetes.Clientset
 	functions *Functions
 	// IgnoreFields from walking where key is field name and value is field type
@@ -68,7 +68,7 @@ func (w StructTemplater) Template(val string) (string, error) {
 			}
 			for k, v := range w.Values {
 				_v := v
-				w.functions.Custom[k] = func() string {
+				w.functions.Custom[k] = func() interface{} {
 					return _v
 				}
 			}
