@@ -416,6 +416,10 @@ func IsImage(obj *unstructured.Unstructured) bool {
 	return obj.GetKind() == "Image"
 }
 
+func IsNode(obj *unstructured.Unstructured) bool {
+	return obj.GetKind() == "Node"
+}
+
 func NewDeployment(ns, name, image string, labels map[string]string, port int32, args ...string) *apps.Deployment {
 	if labels == nil {
 		labels = make(map[string]string)

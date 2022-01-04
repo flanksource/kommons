@@ -250,6 +250,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		return IsBuilderReady(item)
 	case IsImage(item):
 		return IsImageReady(item)
+	case IsNode(item):
+		return IsNodeReady(item)
 	}
 
 	if item.Object["status"] == nil {
@@ -273,6 +275,40 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 		}
 	}
 	return true, ""
+}
+
+func IsNodeReady(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "Node is not reporting status"
+	}
+
+	status := item.Object["status"].(map[string]interface{})
+
+	if _, found := status["conditions"]; !found {
+		return false, "Node is not reporting conditions"
+	}
+
+	conditions := status["conditions"].([]interface{})
+	if len(conditions) == 0 {
+		return false, "Node is not reporting conditions"
+	}
+	message := ""
+	ready := true
+	for _, raw := range conditions {
+		condition := raw.(map[string]interface{})
+		if condition["type"] != "Ready" {
+			if condition["status"] == "True" {
+				ready = false
+				message += fmt.Sprintf("Failure %s: %s\n", condition["type"], condition["message"])
+			}
+		} else {
+			if condition["status"] == "False" {
+				ready = false
+				message += fmt.Sprintf("Node not ready: %s", condition["message"])
+			}
+		}
+	}
+	return ready, message
 }
 
 func IsBuilderReady(item *unstructured.Unstructured) (bool, string) {
