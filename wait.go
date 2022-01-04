@@ -279,7 +279,7 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 
 func IsNodeReady(item *unstructured.Unstructured) (bool, string) {
 	if item.Object["status"] == nil {
-		return false, "Node is not reporting status"
+		return false, "⏳ waiting to report status"
 	}
 
 	status := item.Object["status"].(map[string]interface{})
@@ -299,7 +299,8 @@ func IsNodeReady(item *unstructured.Unstructured) (bool, string) {
 		if condition["type"] != "Ready" {
 			if condition["status"] == "True" {
 				ready = false
-				message += fmt.Sprintf("Failure %s: %s\n", condition["type"], condition["message"])
+if message != "" {message += ", "}
+				message += fmt.Sprintf("%s: %s", condition["type"], condition["message"])
 			}
 		} else {
 			if condition["status"] == "False" {
