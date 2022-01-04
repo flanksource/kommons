@@ -285,12 +285,12 @@ func IsNodeReady(item *unstructured.Unstructured) (bool, string) {
 	status := item.Object["status"].(map[string]interface{})
 
 	if _, found := status["conditions"]; !found {
-		return false, "Node is not reporting conditions"
+		return false, "⏳ waiting to report status"
 	}
 
 	conditions := status["conditions"].([]interface{})
 	if len(conditions) == 0 {
-		return false, "Node is not reporting conditions"
+		return false, "⏳ waiting to report status"
 	}
 	message := ""
 	ready := true
@@ -299,13 +299,15 @@ func IsNodeReady(item *unstructured.Unstructured) (bool, string) {
 		if condition["type"] != "Ready" {
 			if condition["status"] == "True" {
 				ready = false
-if message != "" {message += ", "}
+				if message != "" {
+					message += ", "
+				}
 				message += fmt.Sprintf("%s: %s", condition["type"], condition["message"])
 			}
 		} else {
 			if condition["status"] == "False" {
 				ready = false
-				message += fmt.Sprintf("Node not ready: %s", condition["message"])
+				message += fmt.Sprintf("%s: %s", condition["type"], condition["message"])
 			}
 		}
 	}
