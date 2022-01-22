@@ -624,9 +624,9 @@ func (c *Client) WaitForContainerStart(ns, name string, timeout time.Duration, c
 	for {
 		pod, err := pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			time.Sleep(1)
+			time.Sleep(1 * time.Second)
 			continue
-		} else {
+		} else if err != nil {
 			return err
 		}
 		if start.Add(timeout).Before(time.Now()) {
@@ -642,7 +642,6 @@ func (c *Client) WaitForContainerStart(ns, name string, timeout time.Duration, c
 			}
 		}
 	}
-	return nil
 }
 
 // WaitForPod waits for a pod to be in the specified phase, or returns an

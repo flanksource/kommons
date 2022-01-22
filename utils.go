@@ -751,3 +751,12 @@ func HasTaint(node v1.Node, name string) bool {
 	}
 	return false
 }
+
+
+func GetLabelString(labels map[string]string) string {
+	labelsString := ""
+	for key, value := range labels {
+		labelsString = labelsString + key + "=" + value + ","
+	}
+	return strings.TrimSuffix(labelsString, ",")
+}
