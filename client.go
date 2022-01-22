@@ -707,7 +707,7 @@ func (c *Client) GetPodsForDeployment(name string, labels map[string]string) (po
 	if name != "" {
 		deployments, err = client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelsString,
-			FieldSelector: "metadata.name="+name,
+			FieldSelector: "metadata.name=" + name,
 		})
 	} else {
 		deployments, err = client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{
@@ -729,12 +729,12 @@ func (c *Client) GetPodsForDeployment(name string, labels map[string]string) (po
 			logger.Errorf("error fetching pod for deployment: %v; error: %v", deployment.Name, err)
 			continue
 		}
-		pods.Items  = append(pods.Items, deploymentPod.Items...)
+		pods.Items = append(pods.Items, deploymentPod.Items...)
 	}
 	return
 }
 
-func (c *Client) GetPodsForService(name string, labels map[string]string) (pods *v1.PodList, err error){
+func (c *Client) GetPodsForService(name string, labels map[string]string) (pods *v1.PodList, err error) {
 	client, err := c.GetClientset()
 	if err != nil {
 		return nil, err
@@ -746,7 +746,7 @@ func (c *Client) GetPodsForService(name string, labels map[string]string) (pods 
 	if name != "" {
 		services, err = client.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelsString,
-			FieldSelector: "metadata.name="+name,
+			FieldSelector: "metadata.name=" + name,
 		})
 	} else {
 		services, err = client.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{
@@ -767,7 +767,7 @@ func (c *Client) GetPodsForService(name string, labels map[string]string) (pods 
 			logger.Errorf("error fetching pod for deployment: %v; error: %v", service.Name, err)
 			continue
 		}
-		pods.Items  = append(pods.Items, servicePods.Items...)
+		pods.Items = append(pods.Items, servicePods.Items...)
 	}
 	return
 }
