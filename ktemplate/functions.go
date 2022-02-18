@@ -1,10 +1,10 @@
 package ktemplate
 
 import (
-	"text/template"
-
-	gomplate "github.com/hairyhenderson/gomplate/v3"
+	"github.com/flanksource/commons/text"
+	"github.com/hairyhenderson/gomplate/v3"
 	"k8s.io/client-go/kubernetes"
+	"text/template"
 )
 
 type Functions struct {
@@ -24,6 +24,12 @@ func (f *Functions) FuncMap() template.FuncMap {
 	fm["parseMarkdownTables"] = f.ParseMarkdownTables
 	for k, v := range f.Custom {
 		fm[k] = v
+	}
+	commonFuncs := text.GetTemplateFuncs()
+	for funcName, _ := range commonFuncs {
+		if _, ok := fm[funcName]; !ok {
+			fm[funcName] = commonFuncs[funcName]
+		}
 	}
 	return fm
 }
