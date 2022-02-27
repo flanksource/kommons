@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/AlekSi/pointer"
 	"github.com/mitchellh/mapstructure"
+	"github.com/patrickmn/go-cache"
 	perrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -319,6 +321,19 @@ func (c *Client) GetSecret(namespace, name string) *map[string][]byte {
 	return &secret.Data
 }
 
+// GetSecret returns the data of a secret or nil for any error
+func (c *Client) GetSecretV2(ctx context.Context, namespace, name string) (*map[string][]byte, error) {
+	k8s, err := c.GetClientset()
+	if err != nil {
+		return nil, err
+	}
+	secret, err := k8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &secret.Data, nil
+}
+
 // GetConfigMap returns the data of a secret or nil for any error
 func (c *Client) GetConfigMap(namespace, name string) *map[string]string {
 	k8s, err := c.GetClientset()
@@ -334,15 +349,48 @@ func (c *Client) GetConfigMap(namespace, name string) *map[string]string {
 	return &cm.Data
 }
 
+// GetConfigMap returns the data of a secret or nil for any error
+func (c *Client) GetConfigMapV2(ctx context.Context, namespace, name string) (*map[string]string, error) {
+	k8s, err := c.GetClientset()
+	if err != nil {
+		return nil, err
+	}
+	cm, err := k8s.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &cm.Data, nil
+}
+
+// Create a cache with a default expiration time of 5 minutes, and which
+// purges expired items every 10 minutes
+var envCache = cache.New(5*time.Minute, 10*time.Minute)
+
+func (c *Client) GetEnvValueFromCache(input EnvVar, namespace string, expiry time.Duration) (string, string, error) {
+	if input.ValueFrom == nil {
+		return input.Name, input.Value, nil
+	}
+	if value, found := envCache.Get(input.GetCacheKey()); found {
+		return input.Name, value.(string), nil
+	}
+	_, value, err := c.GetEnvValue(input, namespace)
+	if err != nil {
+		return "", "", err
+	}
+	envCache.Set(input.GetCacheKey(), value, expiry)
+	return input.Name, value, nil
+}
+
 func (c *Client) GetEnvValue(input EnvVar, namespace string) (string, string, error) {
+	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	if input.Value != "" {
 		return input.Name, input.Value, nil
 	}
 	if input.ValueFrom != nil {
 		if input.ValueFrom.SecretKeyRef != nil {
-			secret := c.GetSecret(namespace, input.ValueFrom.SecretKeyRef.Name)
+			secret, err := c.GetSecretV2(ctx, namespace, input.ValueFrom.SecretKeyRef.Name)
 			if secret == nil {
-				return "", "", perrors.New(fmt.Sprintf("Could not get contents of secret %v from namespace %v", input.ValueFrom.SecretKeyRef.Name, namespace))
+				return "", "", perrors.New(fmt.Sprintf("Could not get contents of secret %v from namespace %v: %v", input.ValueFrom.SecretKeyRef.Name, namespace, err))
 			}
 
 			value, ok := (*secret)[input.ValueFrom.SecretKeyRef.Key]
@@ -352,9 +400,9 @@ func (c *Client) GetEnvValue(input EnvVar, namespace string) (string, string, er
 			return input.Name, string(value), nil
 		}
 		if input.ValueFrom.ConfigMapKeyRef != nil {
-			cm := c.GetConfigMap(namespace, input.ValueFrom.ConfigMapKeyRef.Name)
+			cm, err := c.GetConfigMapV2(ctx, namespace, input.ValueFrom.ConfigMapKeyRef.Name)
 			if cm == nil {
-				return "", "", perrors.New(fmt.Sprintf("Could not get contents of configmap %v from namespace %v", input.ValueFrom.ConfigMapKeyRef.Name, namespace))
+				return "", "", perrors.New(fmt.Sprintf("Could not get contents of configmap %v from namespace %v: %v", input.ValueFrom.ConfigMapKeyRef.Name, namespace, err))
 			}
 			value, ok := (*cm)[input.ValueFrom.ConfigMapKeyRef.Key]
 			if !ok {

@@ -5,11 +5,12 @@ go 1.16
 require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/TomOnTime/utfutil v0.0.0-20210710122150-437f72b26edf
-	github.com/flanksource/commons v1.5.12
+	github.com/flanksource/commons v1.5.13
 	github.com/gomarkdown/markdown v0.0.0-20210820032736-385812cbea76
 	github.com/hairyhenderson/gomplate/v3 v3.6.0
 	github.com/mitchellh/mapstructure v1.3.3
 	github.com/mitchellh/reflectwalk v1.0.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.0.0
 	github.com/sirupsen/logrus v1.7.0

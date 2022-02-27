@@ -43,6 +43,30 @@ type EnvVar struct {
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
+func (e EnvVar) GetKey() string {
+	if e.ValueFrom.SecretKeyRef != nil {
+		return e.ValueFrom.SecretKeyRef.Key
+	}
+	if e.ValueFrom.ConfigMapKeyRef != nil {
+		return e.ValueFrom.ConfigMapKeyRef.Key
+	}
+	return ""
+}
+
+func (e EnvVar) GetCacheKey() string {
+	if e.ValueFrom == nil {
+		return e.Name
+	}
+	if e.ValueFrom.SecretKeyRef != nil {
+
+		return e.Name + e.ValueFrom.SecretKeyRef.Name + e.ValueFrom.SecretKeyRef.Key
+	}
+	if e.ValueFrom.ConfigMapKeyRef != nil {
+		return e.Name + e.ValueFrom.ConfigMapKeyRef.Name + e.ValueFrom.ConfigMapKeyRef.Key
+	}
+	return e.Name
+}
+
 func (e EnvVar) IsEmpty() bool {
 	return e.Value == "" && e.ValueFrom == nil
 }
