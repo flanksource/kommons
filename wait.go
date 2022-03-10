@@ -270,7 +270,10 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	}
 	for _, raw := range conditions {
 		condition := raw.(map[string]interface{})
-		if condition["type"] != "Ready" && condition["status"] != "True" {
+		if condition["type"] != "Ready" && condition["status"] != "False" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+		}
+		if condition["type"] == "Ready" && condition["status"] != "True" {
 			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
 		}
 	}
