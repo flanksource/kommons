@@ -30,6 +30,21 @@ func TestDeploy(client kubernetes.Interface, ns string, deploymentName string, t
 	TestPodsByLabels(client, deploymentName, ns, labelMap, t)
 }
 
+func TestStatefulSet(client kubernetes.Interface, ns string, name string, t *console.TestResults) {
+	if client == nil {
+		t.Failf(name, "failed to get kubernetes client")
+		return
+	}
+
+	statefulset, err := client.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		t.Failf(name, "statefulset not found")
+		return
+	}
+	labelMap, _ := metav1.LabelSelectorAsMap(statefulset.Spec.Selector)
+	TestPodsByLabels(client, name, ns, labelMap, t)
+}
+
 func TestDaemonSet(client kubernetes.Interface, ns string, name string, t *console.TestResults) {
 	testName := name
 	if client == nil {
