@@ -269,19 +269,15 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	if len(conditions) == 0 {
 		return false, "⏳ waiting to become ready"
 	}
+
+	failureTypesSuffix := []string{"Failed", "NotReady", "Pressure"}
 	for _, raw := range conditions {
 		condition := raw.(map[string]interface{})
-		trueIsGood := false
-
-		if condition["type"] == "Ready" || condition["type"] == "Initialized" {
-			trueIsGood = true
+		if condition["type"] == "Ready" && condition["status"] == "True" {
+			return true, ""
 		}
-
-		if !trueIsGood && condition["status"] != "False" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
-		}
-		if trueIsGood && condition["status"] != "True" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+		if anySuffixesInItem(failureTypesSuffix, condition["type"].(string)) && condition["status"] != "False" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
 		}
 	}
 	return true, ""
@@ -897,6 +893,16 @@ func (c *Client) WaitForPodCommand(ns, name string, container string, timeout ti
 func itemInList(items []string, ptr string) bool {
 	for _, item := range items {
 		if item == ptr {
+			return true
+		}
+	}
+	return false
+}
+
+// checks if any suffix on the given list of suffixes is present on the item
+func anySuffixesInItem(suffixes []string, item string) bool {
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(item, suffix) {
 			return true
 		}
 	}
