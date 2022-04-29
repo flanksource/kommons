@@ -303,7 +303,7 @@ func IsPodReadyAndRunning(item *unstructured.Unstructured) (bool, string) {
 		condition := raw.(map[string]interface{})
 		successStatus := false
 
-		if itemInList(successTypes, condition["type"].(string)) {
+		if sliceContains(successTypes, condition["type"].(string)) {
 			successStatus = true
 		}
 		if successStatus && condition["status"] != "True" {
