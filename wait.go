@@ -224,6 +224,8 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	c.Debugf("[%s] checking readiness", GetName(item))
 
 	switch {
+	case IsPod(item):
+		return IsPodReadyAndRunning(item)
 	case IsSecret(item) || IsConfigMap(item):
 		return IsDataContainerReady(item)
 	case IsService(item):
@@ -253,7 +255,6 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	case IsNode(item):
 		return IsNodeReady(item)
 	}
-
 	if item.Object["status"] == nil {
 		return false, "⏳ waiting to become ready"
 	}
@@ -268,21 +269,48 @@ func (c *Client) IsReady(item *unstructured.Unstructured) (bool, string) {
 	if len(conditions) == 0 {
 		return false, "⏳ waiting to become ready"
 	}
+
+	failureTypesSuffix := []string{"Failed", "NotReady", "Pressure"}
 	for _, raw := range conditions {
 		condition := raw.(map[string]interface{})
-		trueIsGood := false
+		if condition["type"] == "Ready" && condition["status"] == "True" {
+			return true, ""
+		}
+		if anySuffixesInItem(failureTypesSuffix, condition["type"].(string)) && condition["status"] != "False" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
+		}
+	}
+	return true, ""
+}
 
-		if condition["type"] == "Ready" {
-			trueIsGood = true
+func IsPodReadyAndRunning(item *unstructured.Unstructured) (bool, string) {
+	if item.Object["status"] == nil {
+		return false, "⏳ waiting to become ready"
+	}
+
+	status := item.Object["status"].(map[string]interface{})
+
+	if _, found := status["conditions"]; !found {
+		return false, "⏳ waiting to become ready"
+	}
+
+	conditions := status["conditions"].([]interface{})
+	if len(conditions) == 0 {
+		return false, "⏳ waiting to become ready"
+	}
+	var successTypes = []string{"Ready", "Initialized", "ContainersReady", "PodScheduled"}
+	for _, raw := range conditions {
+		condition := raw.(map[string]interface{})
+		successStatus := false
+
+		if sliceContains(successTypes, condition["type"].(string)) {
+			successStatus = true
 		}
-		if strings.HasSuffix("initialized", strings.ToLower(condition["type"].(string))) {
-			trueIsGood = true
+		if successStatus && condition["status"] != "True" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
 		}
-		if !trueIsGood && condition["status"] != "False" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
-		}
-		if trueIsGood && condition["status"] != "True" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+		if !successStatus && condition["status"] != "False" {
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
 		}
 	}
 	return true, ""
@@ -860,4 +888,23 @@ func (c *Client) WaitForPodCommand(ns, name string, container string, timeout ti
 		}
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func itemInList(items []string, ptr string) bool {
+	for _, item := range items {
+		if item == ptr {
+			return true
+		}
+	}
+	return false
+}
+
+// checks if any suffix on the given list of suffixes is present on the item
+func anySuffixesInItem(suffixes []string, item string) bool {
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(item, suffix) {
+			return true
+		}
+	}
+	return false
 }
