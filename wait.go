@@ -307,10 +307,10 @@ func IsPodReadyAndRunning(item *unstructured.Unstructured) (bool, string) {
 			successStatus = true
 		}
 		if successStatus && condition["status"] != "True" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
 		}
 		if !successStatus && condition["status"] != "False" {
-			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["message"])
+			return false, fmt.Sprintf("⏳ waiting for %s/%s: %s", condition["type"], condition["status"], condition["reason"])
 		}
 	}
 	return true, ""
