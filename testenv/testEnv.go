@@ -25,7 +25,7 @@ var APIServerDefaultArgs = []string{
 }
 
 func InstallTestBin(version string) (string, error) {
-	dir, err := os.TempDir("", "kubebuilder-*")
+	dir, err := os.MkdirTemp("", "kubebuilder-*")
 	if err != nil {
 		return "", err
 	}
