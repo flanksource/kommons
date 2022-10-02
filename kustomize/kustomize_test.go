@@ -92,7 +92,7 @@ func handleError(err error, t *testing.T) {
 }
 
 func getFileBuffer(filePath string) ([]byte, error) {
-	buf, err := io.ReadFile(filePath)
+	buf, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.Errorf("error reading file %v: %v", filePath, err)
 		return nil, err

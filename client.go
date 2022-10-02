@@ -6,7 +6,6 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 
@@ -141,7 +140,7 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 	for _, patch := range patches {
 		if files.Exists(patch) {
 			name = fmt.Sprintf("%d-%s", no, filepath.Base(patch))
-			patchBytes, err := io.ReadFile(patch)
+			patchBytes, err := os.ReadFile(patch)
 			if err != nil {
 				return nil, err
 			}
