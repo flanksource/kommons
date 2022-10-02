@@ -2,19 +2,19 @@ package kustomize
 
 import (
 	"bytes"
+	"io"
+	"os"
+	"reflect"
+	"testing"
+
 	"github.com/TomOnTime/utfutil"
 	"github.com/flanksource/commons/logger"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
-	"io"
-	"io/ioutil"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"os"
-	"reflect"
-	"testing"
 )
 
 type UTFWriteCloser interface {
@@ -92,7 +92,7 @@ func handleError(err error, t *testing.T) {
 }
 
 func getFileBuffer(filePath string) ([]byte, error) {
-	buf, err := ioutil.ReadFile(filePath)
+	buf, err := io.ReadFile(filePath)
 	if err != nil {
 		logger.Errorf("error reading file %v: %v", filePath, err)
 		return nil, err
