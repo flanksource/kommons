@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"time"
 
@@ -66,7 +66,7 @@ func read(req *rest.Request) string {
 	if err != nil {
 		return fmt.Sprintf("Failed to stream logs %v", err)
 	}
-	data, err := ioutil.ReadAll(stream)
+	data, err := io.ReadAll(stream)
 	if err != nil {
 		return fmt.Sprintf("Failed to stream logs %v", err)
 	}

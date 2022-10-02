@@ -5,25 +5,21 @@ import (
 	"bytes"
 	"container/list"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	certs "github.com/flanksource/commons/certs"
 	"github.com/flanksource/commons/files"
 	"github.com/flanksource/commons/logger"
 	"github.com/flanksource/commons/utils"
-	"github.com/flanksource/kommons/etcd"
 	"github.com/flanksource/kommons/kustomize"
 	"github.com/flanksource/kommons/proxy"
 	"github.com/pkg/errors"
@@ -43,6 +39,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/transport"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 var immutableAnnotations = []string{
@@ -60,13 +57,11 @@ type Client struct {
 	ApplyHook            ApplyHook
 	ImmutableAnnotations []string
 	Trace                bool
-
-	client              *kubernetes.Clientset
-	dynamicClient       dynamic.Interface
-	restConfig          *rest.Config
-	etcdClientGenerator *etcd.EtcdClientGenerator
-	kustomizeManager    *kustomize.Manager
-	restMapper          meta.RESTMapper
+	client               *kubernetes.Clientset
+	dynamicClient        dynamic.Interface
+	restConfig           *rest.Config
+	kustomizeManager     *kustomize.Manager
+	restMapper           meta.RESTMapper
 }
 
 func NewClientFromDefaults(log logger.Logger) (*Client, error) {
@@ -83,7 +78,7 @@ func NewClientFromDefaults(log logger.Logger) (*Client, error) {
 		}
 	}
 
-	data, err := ioutil.ReadFile(kubeconfig)
+	data, err := os.ReadFile(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +128,7 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 	if c.kustomizeManager != nil {
 		return c.kustomizeManager, nil
 	}
-	dir, _ := ioutil.TempDir("", "karina-kustomize")
+	fs := filesys.MakeFsInMemory()
 	patches, err := c.GetKustomizePatches()
 	if err != nil {
 		return nil, err
@@ -146,7 +141,7 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 	for _, patch := range patches {
 		if files.Exists(patch) {
 			name = fmt.Sprintf("%d-%s", no, filepath.Base(patch))
-			patchBytes, err := ioutil.ReadFile(patch)
+			patchBytes, err := io.ReadFile(patch)
 			if err != nil {
 				return nil, err
 			}
@@ -162,12 +157,12 @@ func (c *Client) GetKustomize() (*kustomize.Manager, error) {
 		if err != nil {
 			return nil, perrors.WithMessagef(err, "syntax error when reading %s ", name)
 		}
-		if _, err := files.CopyFromReader(bytes.NewBuffer(*patchData), dir+"/"+name, 0644); err != nil {
-			return nil, err
-		}
+		fs.WriteFile(name, *patchData)
+
 	}
-	kustomizeManager, err := kustomize.GetManager(dir)
-	c.kustomizeManager = kustomizeManager
+	c.kustomizeManager = &kustomize.Manager{
+		FileSystem: fs,
+	}
 	return c.kustomizeManager, err
 }
 
@@ -252,24 +247,6 @@ func (c *Client) GetRestMapper() (meta.RESTMapper, error) {
 	}
 	c.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cache)
 	return c.restMapper, err
-}
-
-func (c *Client) GetEtcdClientGenerator(ca *certs.Certificate) (*etcd.EtcdClientGenerator, error) {
-	if c.etcdClientGenerator != nil {
-		return c.etcdClientGenerator, nil
-	}
-	client, err := c.GetClientset()
-	if err != nil {
-		return nil, err
-	}
-	rest, _ := c.GetRESTConfig()
-	caPool := x509.NewCertPool()
-	caPool.AppendCertsFromPEM(ca.EncodedCertificate())
-	cert, _ := tls.X509KeyPair(ca.EncodedCertificate(), ca.EncodedPrivateKey())
-	return etcd.NewEtcdClientGenerator(client, rest, &tls.Config{
-		RootCAs:      caPool,
-		Certificates: []tls.Certificate{cert},
-	}), nil
 }
 
 func (c *Client) Refresh(item *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -456,36 +433,6 @@ func (c *Client) Update(namespace string, item runtime.Object) error {
 
 	_, err = client.Update(context.TODO(), unstructuredObject, metav1.UpdateOptions{})
 	return err
-}
-
-func (c *Client) GetEtcdClient(ctx context.Context) (*etcd.Client, error) {
-	clientset, err := c.GetClientset()
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to get clientset")
-	}
-	secret, err := clientset.CoreV1().Secrets("kube-system").Get(context.TODO(), "etcd-certs", metav1.GetOptions{})
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to get secret etcd-certs in namespace kube-system")
-	}
-	cert, err := certs.DecodeCertificate(secret.Data["tls.crt"], secret.Data["tls.key"])
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to decode etcd certificates")
-	}
-	etcdClientGenerator, err := c.GetEtcdClientGenerator(cert)
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to get etcd client generator")
-	}
-
-	masterNode, err := c.GetMasterNode()
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to get master node")
-	}
-	etcdClient, err := etcdClientGenerator.ForNode(ctx, masterNode)
-	if err != nil {
-		return nil, perrors.Wrap(err, "failed to get etcd client")
-	}
-
-	return etcdClient, nil
 }
 
 func (c *Client) GetJobPod(namespace, jobName string) (string, error) {

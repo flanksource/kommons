@@ -208,7 +208,7 @@ func (c *Client) GetAPIResource(name string) (*metav1.APIResource, error) {
 		return nil, perrors.Wrap(err, "failed to get rest mapper")
 	}
 
-	resources, err := clientset.ServerResources()
+	resources, err := clientset.ServerPreferredResources()
 	if err != nil {
 		return nil, perrors.Wrap(err, "failed to get server resources")
 	}

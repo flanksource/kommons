@@ -1,7 +1,6 @@
 package testenv
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,7 @@ var APIServerDefaultArgs = []string{
 }
 
 func InstallTestBin(version string) (string, error) {
-	dir, err := ioutil.TempDir("", "kubebuilder-*")
+	dir, err := os.MkdirTemp("", "kubebuilder-*")
 	if err != nil {
 		return "", err
 	}
