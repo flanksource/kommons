@@ -1,10 +1,11 @@
 package ktemplate
 
 import (
-	"github.com/flanksource/commons/text"
-	"github.com/hairyhenderson/gomplate/v3"
-	"k8s.io/client-go/kubernetes"
 	"text/template"
+
+	"github.com/flanksource/commons/text"
+	"github.com/flanksource/gomplate/v3"
+	"k8s.io/client-go/kubernetes"
 )
 
 type Functions struct {
