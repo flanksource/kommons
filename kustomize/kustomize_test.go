@@ -15,6 +15,9 @@ import (
 	"golang.org/x/text/transform"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/pkg/gvk"
+	"sigs.k8s.io/kustomize/pkg/patch"
 )
 
 type UTFWriteCloser interface {
@@ -324,6 +327,139 @@ func TestGetUnstructuredObjects(t *testing.T) {
 				if !reflect.DeepEqual(got[index], tt.want[index]) {
 					t.Errorf("GetUnstructuredObjects() got = %v, want %v", got[index], tt.want[index])
 				}
+			}
+		})
+	}
+}
+
+func TestKustomize(t *testing.T) {
+	itemOne := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"data": map[string]interface{}{
+				"logging.level.org.springframework":     "DEBUG",
+				"logging.level.org.springframework.web": "INFO",
+				"some-key":                              "value-from-spring",
+			},
+			"kind": "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "spring-defaults-spring",
+				"namespace": "default",
+			},
+		},
+	}
+	strategicPatch := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "spring-defaults-spring",
+				"namespace": "default",
+			},
+			"data": map[string]interface{}{
+				"logging.level.org.springframework": "ERROR",
+			},
+		},
+	}
+	json6902Patch := json6902{
+		Target: &patch.Target{
+			Namespace: "default",
+			Name:      "spring-defaults-spring",
+			Gvk: gvk.Gvk{
+				Version: "v1",
+				Kind:    "ConfigMap",
+			},
+		},
+		Patch: "[{\"op\": \"replace\", \"path\": \"/data/logging.level.org.springframework\", \"value\": \"ERROR\"}]",
+	}
+	patchedItem := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"data": map[string]interface{}{
+				"logging.level.org.springframework":     "ERROR",
+				"logging.level.org.springframework.web": "INFO",
+				"some-key":                              "value-from-spring",
+			},
+			"kind": "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "spring-defaults-spring",
+				"namespace": "default",
+				"annotations": map[string]interface{}{
+					"kustomize/patched": "true",
+				},
+			},
+		},
+	}
+
+	type args struct {
+		namespace             string
+		object                runtime.Object
+		strategicMergePatches strategicMergeSlice
+		json6902Patches       json6902Slice
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    runtime.Object
+		wantErr bool
+	}{
+		{
+			name: "f(default, item) => []runtime.Object{item}",
+			args: args{
+				namespace:             "default",
+				object:                itemOne,
+				strategicMergePatches: nil,
+				json6902Patches:       nil,
+			},
+			want:    itemOne,
+			wantErr: false,
+		},
+		{
+			name: "f(default, item) => []runtime.Object{strategicMergePatchedItem}",
+			args: args{
+				namespace:             "default",
+				object:                itemOne,
+				strategicMergePatches: strategicMergeSlice{strategicPatch},
+				json6902Patches:       nil,
+			},
+			want:    patchedItem,
+			wantErr: false,
+		},
+		{
+			name: "f(default, item) => []runtime.Object{JSON6902PatchedItem}",
+			args: args{
+				namespace:             "default",
+				object:                itemOne,
+				strategicMergePatches: nil,
+				json6902Patches:       json6902Slice{&json6902Patch},
+			},
+			want:    patchedItem,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := Manager{
+				FileSystem: filesys.MakeFsInMemory(),
+			}
+
+			if tt.args.strategicMergePatches != nil {
+				manager.StrategicMergePatches = tt.args.strategicMergePatches
+			}
+			if tt.args.json6902Patches != nil {
+				manager.JSON6902Patches = tt.args.json6902Patches
+			}
+
+			got, err := manager.Kustomize(tt.args.namespace, tt.args.object)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Kustomize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			testObject := got[0].(*unstructured.Unstructured).Object
+			expected := tt.want.(*unstructured.Unstructured).Object
+			if !reflect.DeepEqual(testObject, expected) {
+				t.Errorf("Kustomize() got = %v, want %v", testObject, expected)
 			}
 		})
 	}

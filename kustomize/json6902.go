@@ -16,6 +16,7 @@ package kustomize
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/pkg/gvk"
 	"sigs.k8s.io/kustomize/pkg/ifc"
 	"sigs.k8s.io/kustomize/pkg/patch"
 )
@@ -49,9 +50,12 @@ func newJSON6902FromFile(f patch.Json6902, ldr ifc.Loader, file string) (*json69
 func (s *json6902Slice) filterByResource(namespace string, r *unstructured.Unstructured) json6902Slice {
 	var result json6902Slice
 	for _, p := range *s {
-		if p.Group == r.GroupVersionKind().Group &&
-			p.Version == r.GroupVersionKind().Version &&
-			p.Kind == r.GroupVersionKind().Kind &&
+		selector := gvk.Gvk{
+			Group:   r.GroupVersionKind().Group,
+			Version: r.GroupVersionKind().Version,
+			Kind:    r.GroupVersionKind().Kind,
+		}
+		if p.IsSelected(&selector) &&
 			(p.Namespace == r.GetNamespace() || p.Namespace == namespace) &&
 			p.Name == r.GetName() {
 			result = append(result, p)
