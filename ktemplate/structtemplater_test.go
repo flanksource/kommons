@@ -12,6 +12,7 @@ type Test struct {
 	NoTemplate string
 	Inner      Inner
 	Labels     map[string]string `template:"true"`
+	LabelsRaw  map[string]string
 }
 
 type Inner struct {
@@ -41,7 +42,6 @@ var tests = []test{
 		Output: &Test{
 			Template:   "hello world",
 			NoTemplate: "hello {{.msg}}",
-			Labels:     map[string]string{},
 		},
 	},
 	{
@@ -60,7 +60,6 @@ var tests = []test{
 		},
 		Output: &Test{
 			Template: "hello world",
-			Labels:   map[string]string{},
 		},
 	},
 	{
@@ -88,6 +87,10 @@ var tests = []test{
 				"code":              "{{code}}",
 				"operation":         "noop",
 			},
+			LabelsRaw: map[string]string{
+				"address":           "{{city}}, {{country}}",
+				"{{colorOf}} color": "light $(color)",
+			},
 		},
 		Output: &Test{
 			Template: "Special Agent - James Bond!",
@@ -96,6 +99,10 @@ var tests = []test{
 				"eye color": "light blue",
 				"code":      "007",
 				"operation": "noop",
+			},
+			LabelsRaw: map[string]string{
+				"address":           "{{city}}, {{country}}",
+				"{{colorOf}} color": "light $(color)",
 			},
 		},
 	},
