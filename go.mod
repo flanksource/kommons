@@ -1,6 +1,6 @@
 module github.com/flanksource/kommons
 
-go 1.17
+go 1.20
 
 require (
 	github.com/AlekSi/pointer v1.1.0
