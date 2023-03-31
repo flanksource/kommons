@@ -1,10 +1,10 @@
 package ktemplate
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/flanksource/commons/logger"
+	"github.com/google/go-cmp/cmp"
 )
 
 type Test struct {
@@ -41,6 +41,7 @@ var tests = []test{
 		Output: &Test{
 			Template:   "hello world",
 			NoTemplate: "hello {{.msg}}",
+			Labels:     map[string]string{},
 		},
 	},
 	{
@@ -59,6 +60,7 @@ var tests = []test{
 		},
 		Output: &Test{
 			Template: "hello world",
+			Labels:   map[string]string{},
 		},
 	},
 	{
@@ -69,24 +71,31 @@ var tests = []test{
 				{Left: "$(", Right: ")"},
 			},
 			Values: map[string]interface{}{
-				"name":  "James Bond",
-				"color": "blue",
-				"code":  "007",
+				"name":    "James Bond",
+				"colorOf": "eye",
+				"color":   "blue",
+				"code":    "007",
+				"city":    "London",
+				"country": "UK",
 			},
 			ValueFunctions: true,
 		},
 		Input: &Test{
-			Template: "Hello, $(name)!",
+			Template: "Special Agent - $(name)!",
 			Labels: map[string]string{
-				"color": "light $(color)",
-				"code":  "{{code}}",
+				"address":           "{{city}}, {{country}}",
+				"{{colorOf}} color": "light $(color)",
+				"code":              "{{code}}",
+				"operation":         "noop",
 			},
 		},
 		Output: &Test{
-			Template: "Hello, James Bond!",
+			Template: "Special Agent - James Bond!",
 			Labels: map[string]string{
-				"color": "light blue",
-				"code":  "007",
+				"address":   "London, UK",
+				"eye color": "light blue",
+				"code":      "007",
+				"operation": "noop",
 			},
 		},
 	},
@@ -99,8 +108,8 @@ func TestMain(t *testing.T) {
 			i := test.Input
 			if err := test.StructTemplater.Walk(i); err != nil {
 				t.Error(err)
-			} else if !reflect.DeepEqual(i, test.Output) {
-				t.Errorf("expected %+v\tgot %+v", test.Output, test.Input)
+			} else if diff := cmp.Diff(i, test.Output); diff != "" {
+				t.Errorf(diff)
 			}
 		})
 	}

@@ -55,19 +55,39 @@ func (w StructTemplater) StructField(f reflect.StructField, v reflect.Value) err
 		v.SetString(val)
 
 	case reflect.Map:
+		newMap := reflect.MakeMap(v.Type())
 		for _, key := range v.MapKeys() {
 			val := v.MapIndex(key)
+			newKey, err := w.TemplateKey(key)
+			if err != nil {
+				return err
+			}
+
 			if val.Kind() == reflect.String {
 				newVal, err := w.Template(val.String())
 				if err != nil {
 					return err
 				}
-				v.SetMapIndex(key, reflect.ValueOf(newVal))
+				newMap.SetMapIndex(newKey, reflect.ValueOf(newVal))
+			} else {
+				newMap.SetMapIndex(newKey, val)
 			}
 		}
+		v.Set(newMap)
 	}
 
 	return nil
+}
+
+func (w StructTemplater) TemplateKey(v reflect.Value) (reflect.Value, error) {
+	if v.Kind() == reflect.String {
+		key, err := w.Template(v.String())
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(key), nil
+	}
+	return v, nil
 }
 
 func (w StructTemplater) Walk(object interface{}) error {
