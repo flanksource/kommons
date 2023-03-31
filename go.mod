@@ -8,6 +8,7 @@ require (
 	github.com/flanksource/commons v1.6.0
 	github.com/flanksource/gomplate/v3 v3.20.1
 	github.com/gomarkdown/markdown v0.0.0-20210820032736-385812cbea76
+	github.com/google/go-cmp v0.5.9
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -85,7 +86,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -181,4 +181,3 @@ replace (
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.24.4
 	k8s.io/client-go => k8s.io/client-go v0.24.4
 )
-
