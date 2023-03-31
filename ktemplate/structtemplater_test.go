@@ -11,6 +11,7 @@ type Test struct {
 	Template   string `template:"true"`
 	NoTemplate string
 	Inner      Inner
+	Labels     map[string]string `template:"true"`
 }
 
 type Inner struct {
@@ -60,6 +61,35 @@ var tests = []test{
 			Template: "hello world",
 		},
 	},
+	{
+		StructTemplater: StructTemplater{
+			RequiredTag: "template",
+			DelimSets: []Delims{
+				{Left: "{{", Right: "}}"},
+				{Left: "$(", Right: ")"},
+			},
+			Values: map[string]interface{}{
+				"name":  "James Bond",
+				"color": "blue",
+				"code":  "007",
+			},
+			ValueFunctions: true,
+		},
+		Input: &Test{
+			Template: "Hello, $(name)!",
+			Labels: map[string]string{
+				"color": "light $(color)",
+				"code":  "{{code}}",
+			},
+		},
+		Output: &Test{
+			Template: "Hello, James Bond!",
+			Labels: map[string]string{
+				"color": "light blue",
+				"code":  "007",
+			},
+		},
+	},
 }
 
 func TestMain(t *testing.T) {
@@ -70,7 +100,7 @@ func TestMain(t *testing.T) {
 			if err := test.StructTemplater.Walk(i); err != nil {
 				t.Error(err)
 			} else if !reflect.DeepEqual(i, test.Output) {
-				t.Errorf("Output is not expected %+v != %+v", test.Input, test.Output)
+				t.Errorf("expected %+v\tgot %+v", test.Output, test.Input)
 			}
 		})
 	}

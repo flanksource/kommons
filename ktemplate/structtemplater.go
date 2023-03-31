@@ -32,21 +32,41 @@ func (w StructTemplater) Struct(reflect.Value) error {
 }
 
 func (w StructTemplater) StructField(f reflect.StructField, v reflect.Value) error {
+	if !v.CanSet() {
+		return nil
+	}
+
 	for key, value := range w.IgnoreFields {
 		if key == f.Name && value == f.Type.String() {
 			return reflectwalk.SkipEntry
 		}
 	}
+
 	if w.RequiredTag != "" && f.Tag.Get(w.RequiredTag) != "true" {
 		return reflectwalk.SkipEntry
 	}
-	if v.CanSet() && v.Kind() == reflect.String {
+
+	switch v.Kind() {
+	case reflect.String:
 		val, err := w.Template(v.String())
 		if err != nil {
 			return err
 		}
 		v.SetString(val)
+
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			val := v.MapIndex(key)
+			if val.Kind() == reflect.String {
+				newVal, err := w.Template(val.String())
+				if err != nil {
+					return err
+				}
+				v.SetMapIndex(key, reflect.ValueOf(newVal))
+			}
+		}
 	}
+
 	return nil
 }
 
