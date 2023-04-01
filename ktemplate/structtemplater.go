@@ -32,22 +32,64 @@ func (w StructTemplater) Struct(reflect.Value) error {
 }
 
 func (w StructTemplater) StructField(f reflect.StructField, v reflect.Value) error {
+	if !v.CanSet() {
+		return nil
+	}
+
 	for key, value := range w.IgnoreFields {
 		if key == f.Name && value == f.Type.String() {
 			return reflectwalk.SkipEntry
 		}
 	}
+
 	if w.RequiredTag != "" && f.Tag.Get(w.RequiredTag) != "true" {
 		return reflectwalk.SkipEntry
 	}
-	if v.CanSet() && v.Kind() == reflect.String {
+
+	switch v.Kind() {
+	case reflect.String:
 		val, err := w.Template(v.String())
 		if err != nil {
 			return err
 		}
 		v.SetString(val)
+
+	case reflect.Map:
+		if len(v.MapKeys()) != 0 {
+			newMap := reflect.MakeMap(v.Type())
+			for _, key := range v.MapKeys() {
+				val := v.MapIndex(key)
+				newKey, err := w.templateKey(key)
+				if err != nil {
+					return err
+				}
+
+				if val.Kind() == reflect.String {
+					newVal, err := w.Template(val.String())
+					if err != nil {
+						return err
+					}
+					newMap.SetMapIndex(newKey, reflect.ValueOf(newVal))
+				} else {
+					newMap.SetMapIndex(newKey, val)
+				}
+			}
+			v.Set(newMap)
+		}
 	}
+
 	return nil
+}
+
+func (w StructTemplater) templateKey(v reflect.Value) (reflect.Value, error) {
+	if v.Kind() == reflect.String {
+		key, err := w.Template(v.String())
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(key), nil
+	}
+	return v, nil
 }
 
 func (w StructTemplater) Walk(object interface{}) error {
