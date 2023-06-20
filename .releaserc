@@ -1,3 +1,5 @@
+branches:
+  - name: master
 plugins:
   - - "@semantic-release/commit-analyzer"
     - releaseRules:
@@ -5,8 +7,14 @@ plugins:
         - { type: fix, release: patch }
         - { type: chore, release: patch }
         - { type: refactor, release: patch }
-        - { type: feat, release: minor }
-        - { type: ci, release: false }
-        - { type: style, release: false }
+        - { type: feat, release: patch }
+        - { type: ci, release: patch }
+        - { type: style, release: patch }
+      parserOpts:
+        noteKeywords:
+          - MAJOR RELEASE
   - "@semantic-release/release-notes-generator"
   - - "@semantic-release/github"
+      # From: https://github.com/semantic-release/github/pull/487#issuecomment-1486298997
+    - successComment: false
+      failTitle: false
