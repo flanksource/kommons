@@ -17,14 +17,19 @@ package kustomize
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"regexp"
+	osruntime "runtime"
 	"strings"
 
 	"github.com/TomOnTime/utfutil"
 	"github.com/flanksource/commons/logger"
+	"gopkg.in/flanksource/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/pkg/types"
 
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
@@ -32,6 +37,10 @@ import (
 // Manager define a manager that allow access to kustomize capabilities
 type Manager struct {
 	filesys.FileSystem
+	kustomizeDir          string
+	kustomizationFile     *types.Kustomization
+	strategicMergePatches strategicMergeSlice
+	json6902Patches       json6902Slice
 }
 
 func (km *Manager) AddPatch(name string, data []byte) error {
@@ -74,42 +83,40 @@ func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]run
 			continue
 		}
 
-		// // get patches corresponding to this resource
-		// strategicMerge := km.strategicMergePatches.filterByResource(namespace, resource)
-		// json6902 := km.json6902Patches.filterByResource(namespace, resource)
+		// get patches corresponding to this resource
+		//strategicMerge := km.strategicMergePatches.filterByResource(namespace, resource)
+		//json6902 := km.json6902Patches.filterByResource(namespace, resource)
 
-		// // if there are no patches, for the target resources, exit
-		// patchesCnt := len(strategicMerge) + len(json6902)
+		// if there are no patches, for the target resources, exit
+		//patchesCnt := len(strategicMerge) + len(json6902)
 
-		// if patchesCnt == 0 {
-		// 	kustomized = append(kustomized, resource)
-		// 	continue
-		// }
+		//if patchesCnt == 0 {
+		//kustomized = append(kustomized, resource)
+		//continue
+		//}
 
-		// setAnnotation(resource, "kustomize/patched", "true")
+		setAnnotation(resource, "kustomize/patched", "true")
 
-		// // create an in memory fs to use for the kustomization
-		// memFS := filesys.MakeFsInMemory()
+		// create an in memory fs to use for the kustomization
+		fakeDir := "/"
+		// for Windows we need this to be a drive because kustomize uses filepath.Abs()
+		// which will add a drive letter if there is none. which drive letter is
+		// unimportant as the path is on the fake filesystem anyhow
+		if osruntime.GOOS == "windows" {
+			fakeDir = `C:\`
+		}
 
-		// fakeDir := "/"
-		// // for Windows we need this to be a drive because kustomize uses filepath.Abs()
-		// // which will add a drive letter if there is none. which drive letter is
-		// // unimportant as the path is on the fake filesystem anyhow
-		// if osruntime.GOOS == "windows" {
-		// 	fakeDir = `C:\`
-		// }
+		memFS := filesys.MakeFsInMemory()
 
-		// // writes the resource to a file in the temp file system
-		// b, err := yaml.Marshal(resource)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// name := "resource.yaml"
-		// memFS.WriteFile(filepath.Join(fakeDir, name), b) // nolint: errcheck
+		// writes the resource to a file in the temp file system
+		b, err := yaml.Marshal(resource.Object)
+		if err != nil {
+			return nil, err
+		}
+		name := "resource.yaml"
+		memFS.WriteFile(filepath.Join(fakeDir, name), b) // nolint: errcheck
 
-		// km.kustomizationFile.Resources = []string{name}
-
-		// // writes strategic merge patches to files in the temp file system
+		// writes strategic merge patches to files in the temp file system
 		// km.kustomizationFile.PatchesStrategicMerge = []types.PatchStrategicMerge{}
 		// for i, p := range strategicMerge {
 		// 	b, err := yaml.Marshal(p)
@@ -131,24 +138,26 @@ func (km *Manager) Kustomize(namespace string, objects ...runtime.Object) ([]run
 		// 	km.kustomizationFile.PatchesJson6902 = append(km.kustomizationFile.PatchesJson6902, types.Patch{Target: p.Target, Path: name})
 		// }
 
-		// // writes the kustomization file to the temp file system
-		// kbytes, err := yaml.Marshal(km.kustomizationFile)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// memFS.WriteFile(filepath.Join(fakeDir, "kustomization.yaml"), kbytes) // nolint: errcheck
-
-		// Finally customize the target resource
-		var out bytes.Buffer
-		// if err := kustomize.RunKustomizeBuild(&out, memFS, fakeDir); err != nil {
-		// 	return nil, err
-		// }
-
-		objects, err := GetUnstructuredObjects(out.Bytes())
+		// writes the kustomization file to the temp file system
+		km.kustomizationFile = &types.Kustomization{Resources: []string{name}}
+		kbytes, err := yaml.Marshal(km.kustomizationFile)
 		if err != nil {
 			return nil, err
 		}
-		kustomized = append(kustomized, objects...)
+		memFS.WriteFile(filepath.Join(fakeDir, "kustomization.yaml"), kbytes) // nolint: errcheck
+
+		kresult, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(memFS, fakeDir)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range kresult.Resources() {
+			y, _ := r.AsYAML()
+			objects, err := GetUnstructuredObjects(y)
+			if err != nil {
+				return nil, err
+			}
+			kustomized = append(kustomized, objects...)
+		}
 	}
 	return kustomized, nil
 }
