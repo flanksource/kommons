@@ -1,11 +1,11 @@
-name: Karina upstream
+name: upstream
 
 on:
   pull_request:
     branches: [master, main]
 
 jobs:
-  test:
+  Karina:
     runs-on: ubuntu-latest
     env:
       FILE_CHANGES_TO_CORE_ARTIFACTS: true
@@ -20,19 +20,19 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: kommons
-      
+
       - uses: actions/checkout@v2
         with:
           #Using Main branch of Karina Repository
           repository: flanksource/karina
           path: karina
-      
+
       - uses: actions/setup-go@v2
         with:
           go-version: "1.18" # The Go version to download (if necessary) and use.
-      
+
       - run: go version
-      
+
       - name: replace Module
         run: |
           cd karina
@@ -40,7 +40,7 @@ jobs:
           go mod edit -replace github.com/flanksource/kommons@$module=$GITHUB_WORKSPACE/kommons
           cat go.mod
           go mod tidy
-      
+
       - name: Test Make Linux
         working-directory: ./karina
         run: make linux
@@ -54,17 +54,50 @@ jobs:
           BUILD: test (${{matrix.k8s}}, ${{ matrix.suite }})
           ADDITIONAL_CONFIG: -c test/hosted-tests.yaml
         run: ./test/test.sh
-      
+
       - name: Upload test results
         uses: actions/upload-artifact@v2
         with:
           if-no-files-found: ignore
           name: test-results-${{matrix.k8s}}-${{matrix.suite}}
           path: test-results/
-      
+
       - name: Upload snapshots
         uses: actions/upload-artifact@v2
         with:
           if-no-files-found: ignore
           name: snapshot-${{matrix.k8s}}-${{matrix.suite}}
           path: artifacts/snapshot.zip
+
+  canary-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: kommons
+
+      - uses: actions/checkout@v4
+        with:
+          repository: flanksource/canary-checker
+          path: canary-checker
+          branch: master
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+
+      - name: replace Module
+        run: |
+          cd canary-checker
+          module=$(cat go.mod | grep github.com/flanksource/kommons | awk '{print $2}')
+          go mod edit -replace github.com/flanksource/kommons@$module=$GITHUB_WORKSPACE/kommons
+          cat go.mod
+          go mod tidy
+
+      - name: Test Make Linux
+        working-directory: ./canary-checker
+        run: make linux
+
+      - name: Build
+        working-directory: ./canary-checker
+        run: make
