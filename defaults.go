@@ -295,7 +295,7 @@ func Defaults(obj *unstructured.Unstructured) (*unstructured.Unstructured, error
 		return nil, nil
 	}
 	if _, found, _ := unstructured.NestedString(obj.Object, "metadata", "creationTimestamp"); !found {
-		unstructured.SetNestedField(obj.Object, "metadata", "creationTimestamp", "nil")
+		unstructured.SetNestedField(obj.Object, nil, "metadata", "creationTimestamp")
 	}
 	if IsDeployment(obj) {
 		deploy, err := AsDeployment(obj)
