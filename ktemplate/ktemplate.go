@@ -6,7 +6,7 @@ import (
 	"strings"
 	gotemplate "text/template"
 
-	yaml "gopkg.in/flanksource/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 // Template templates out a template using gomplate

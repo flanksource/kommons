@@ -1,6 +1,6 @@
 module github.com/flanksource/kommons/testenv
 
-go 1.20
+go 1.23
 
 require (
 	github.com/flanksource/commons v1.10.2
@@ -111,4 +111,6 @@ replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.4
 	k8s.io/client-go => k8s.io/client-go v0.20.4
+
+	github.com/flanksource/kommons => ../
 )
