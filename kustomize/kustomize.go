@@ -24,7 +24,7 @@ import (
 
 	"github.com/TomOnTime/utfutil"
 	"github.com/flanksource/commons/logger"
-	"gopkg.in/flanksource/yaml.v3"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"

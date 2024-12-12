@@ -9,7 +9,7 @@ import (
 	"time"
 
 	perrors "github.com/pkg/errors"
-	"gopkg.in/flanksource/yaml.v3"
+	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
